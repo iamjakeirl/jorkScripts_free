@@ -1,0 +1,37 @@
+// ── shared rules applied to every sub-project ───────────────────
+subprojects {
+
+    // 1. language + plugin
+    apply plugin: 'java-library'
+    // "application" will be added per app
+
+    // 2. repos: Maven Central + flatDir for the local jar(s)
+    repositories {
+        mavenCentral()
+        google()
+    }
+
+    // 3. Configure Java toolchain after plugin is applied
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
+    // 4. dependencies common to *all* modules
+    dependencies {
+        compileOnly files("${rootDir}/lib/API.jar")
+        compileOnly 'org.openjfx:javafx-controls:21'
+        compileOnly 'org.openjfx:javafx-graphics:21'
+        compileOnly 'org.openjfx:javafx-base:21'
+
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDirs = ["src"]
+            }
+        }
+    }
+} 

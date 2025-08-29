@@ -1,0 +1,13 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+.cursor
+.vscode
+.claude
+example
+gradle
+lib
+reference
+working
+
+# Ignore Gradle build output directory
+build
