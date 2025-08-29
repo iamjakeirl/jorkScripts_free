@@ -8,6 +8,11 @@ gradle
 lib
 reference
 working
+claude.md
+gradlew
+gradlew.bat
+fullbuild.sh
+settings.gradle.kts
 
 # Ignore Gradle build output directory
 build
