@@ -283,6 +283,13 @@ public class TrapStateManager {
             // Clear any pending collapse detection since trap is now actionable
             missingTrapsTimestamp.remove(pos);
             trapGracePeriods.remove(pos);
+            
+            // Track metrics for successful vs failed catches
+            if (isGreen(current)) {
+                script.onTrapSuccess();
+            } else if (isRed(current)) {
+                script.onTrapFailed();
+            }
         }
         // Any visible state → null: Respawn circle disappeared (likely collapsed or animation)
         else if (previous != null && current == null) {

@@ -19,13 +19,16 @@ import com.osmb.api.ui.tabs.Settings;
 import com.osmb.api.ui.component.tabs.skill.SkillType;
 import com.osmb.api.utils.UIResult;
 import com.osmb.api.ui.component.tabs.skill.SkillsTabComponent.SkillLevel;
+import com.osmb.api.ui.component.tabs.skill.SkillsTabComponent;
 
 import com.osmb.api.ui.component.popout.PopoutPanelContainer;
 import com.osmb.api.ui.component.ComponentContainerStatus;
 import com.jork.script.jorkHunter.javafx.ScriptOptions;
 import com.osmb.api.javafx.TilePickerPanel;
-import com.osmb.api.script.Script;
 import com.jork.utils.ScriptLogger;
+import com.jork.utils.metrics.AbstractMetricsScript;
+import com.jork.utils.metrics.core.MetricType;
+import com.jork.utils.metrics.display.MetricsPanelConfig;
 
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.location.area.impl.RectangleArea;
@@ -39,11 +42,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // JorkHunter Script - Base Class
 // The @ScriptDefinition annotations are in the variant subclasses (variants package)
 // This allows each JAR to have a different name in the OSMB client
-public class JorkHunter extends Script {
+public class JorkHunter extends AbstractMetricsScript {
 
     private final TaskManager taskManager;
     private HuntingConfig huntingConfig; // Configuration for this variant
@@ -77,6 +81,11 @@ public class JorkHunter extends Script {
     private volatile boolean customAnchorSelected = false;
     private WorldPosition customAnchorPosition = null;
     private boolean anchorSelectionInProgress = false;
+    
+    // --- Metrics Tracking -----------------------------------------------------
+    private final AtomicInteger successfulCatches = new AtomicInteger(0);
+    private final AtomicInteger failedCatches = new AtomicInteger(0);
+    private final AtomicInteger totalChecks = new AtomicInteger(0);
 
     public JorkHunter(Object scriptCore) {
         super(scriptCore);
@@ -84,7 +93,7 @@ public class JorkHunter extends Script {
     }
 
     @Override
-    public void onStart() {
+    protected void onMetricsStart() {
         // Load configuration for this variant
         huntingConfig = HuntingConfig.load(this);
         
@@ -164,7 +173,7 @@ public class JorkHunter extends Script {
         // Determine hunter level either manual or automatic
         if (selectedManualLevel > 0) {
             int level = selectedManualLevel;
-            maxTraps = Math.min(5, level / 20 + 1);
+            maxTraps = calculateTrapsForLevel(level);
             ScriptLogger.info(this, "Manual Hunter Level: " + level + " | Max Traps: " + maxTraps);
         } else {
             calculateMaxTraps();
@@ -175,6 +184,9 @@ public class JorkHunter extends Script {
 
         // Load tasks
         initializeTasks();
+        
+        // Initialize metrics after tasks are loaded
+        initializeMetrics();
 
         ScriptLogger.info(this, "Initialisation complete. Starting tasks…");
         initialised = true;
@@ -287,86 +299,70 @@ public class JorkHunter extends Script {
     private void calculateMaxTraps() {
         ScriptLogger.info(this, "Starting Hunter level calculation...");
         
-        try {
-            // First, let's see what widget manager gives us
-            if (getWidgetManager() == null) {
-                ScriptLogger.error(this, "WidgetManager is null!");
-                return;
+        // Null checks first
+        if (getWidgetManager() == null) {
+            ScriptLogger.error(this, "WidgetManager is null!");
+            return;
+        }
+        
+        // Use concrete type from the start
+        Skill skillTab = getWidgetManager().getSkillTab();
+        if (skillTab == null) {
+            ScriptLogger.error(this, "SkillTab is null!");
+            return;
+        }
+        
+        ScriptLogger.info(this, "SkillTab obtained, attempting to get Hunter level...");
+        
+        // Try with retries
+        int maxRetries = 2;
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            if (attempt > 0) {
+                ScriptLogger.info(this, "Retrying Hunter level read (attempt " + (attempt + 1) + "/" + maxRetries + ")");
             }
             
-            Skill skillTab = getWidgetManager().getSkillTab();
-            if (skillTab == null) {
-                ScriptLogger.error(this, "SkillTab is null!");
-                return;
-            }
-            
-            ScriptLogger.info(this, "SkillTab obtained, attempting to get Hunter level...");
-            
-            SkillLevel hunterInfo = 
-                skillTab.getSkillLevel(SkillType.HUNTER);
-                
+            // Get skill level
+            SkillLevel hunterInfo = skillTab.getSkillLevel(SkillType.HUNTER);
             if (hunterInfo == null) {
                 ScriptLogger.warning(this, "HunterInfo is null - skills tab may not be accessible");
-                retryCalculateMaxTraps();
-                return;
+                continue; // Try again
             }
             
             int level = hunterInfo.getLevel();
             ScriptLogger.info(this, "Raw Hunter level from API: " + level);
             
-            maxTraps = Math.min(5, level / 20 + 1);
+            // Calculate max traps using helper method
+            maxTraps = calculateTrapsForLevel(level);
             ScriptLogger.info(this, "Hunter Level: " + level + " | Calculated Max Traps: " + maxTraps);
-            
-        } catch (Exception e) {
-            ScriptLogger.exception(this, "reading Hunter level", e);
-            ScriptLogger.warning(this, "Defaulting to 1 trap due to error");
-            retryCalculateMaxTraps();
+            return; // Success
         }
+        
+        // All retries failed
+        ScriptLogger.warning(this, "Could not read Hunter level after " + maxRetries + " attempts, defaulting to 1 trap");
+        maxTraps = 1;
     }
     
-    private void retryCalculateMaxTraps() {
-        try {
-            // Wait a moment then retry
-            Thread.sleep(Utils.random(450, 650));
-            
-            Skill skillTab = getWidgetManager().getSkillTab();
-            if (skillTab != null) {
-                SkillLevel hunterInfo = 
-                    skillTab.getSkillLevel(SkillType.HUNTER);
-                if (hunterInfo != null) {
-                    int level = hunterInfo.getLevel();
-                    maxTraps = Math.min(5, level / 20 + 1);
-                    ScriptLogger.info(this, "Hunter Level (retry): " + level + " | Max Traps: " + maxTraps);
-                } else {
-                    ScriptLogger.warning(this, "Still could not read Hunter level after retry, defaulting to 1 trap");
-                }
-            } else {
-                ScriptLogger.warning(this, "Skills tab still not available after retry, defaulting to 1 trap");
-            }
-        } catch (Exception e) {
-            ScriptLogger.exception(this, "retrying Hunter level read", e);
-            ScriptLogger.warning(this, "Defaulting to 1 trap due to retry error");
-        }
+    /**
+     * Helper method to calculate max traps based on Hunter level.
+     * Formula: 1 trap at level 1-19, 2 at 20-39, 3 at 40-59, 4 at 60-79, 5 at 80+
+     */
+    private int calculateTrapsForLevel(int level) {
+        return Math.min(5, level / 20 + 1);
     }
 
     public int getMaxTraps() {
         // If maxTraps is still 1 and we're above level 20, try to recalculate
         if (maxTraps == 1) {
-            try {
-                Skill skillTab = getWidgetManager().getSkillTab();
-                if (skillTab != null) {
-                    SkillLevel hunterInfo = 
-                        skillTab.getSkillLevel(SkillType.HUNTER);
-                    if (hunterInfo != null) {
-                        int level = hunterInfo.getLevel();
-                        if (level >= 20) {
-                            maxTraps = Math.min(5, level / 20 + 1);
-                            ScriptLogger.info(this, "Recalculated - Hunter Level: " + level + " | Max Traps: " + maxTraps);
-                        }
+            SkillsTabComponent skillTab = (SkillsTabComponent) getWidgetManager().getSkillTab();
+            if (skillTab != null) {
+                SkillLevel hunterInfo = skillTab.getSkillLevel(SkillType.HUNTER);
+                if (hunterInfo != null) {
+                    int level = hunterInfo.getLevel();
+                    if (level >= 20) {
+                        maxTraps = calculateTrapsForLevel(level);
+                        ScriptLogger.info(this, "Recalculated - Hunter Level: " + level + " | Max Traps: " + maxTraps);
                     }
                 }
-            } catch (Exception e) {
-                // Silently fail, keep using current maxTraps
             }
         }
         return maxTraps;
@@ -414,9 +410,15 @@ public class JorkHunter extends Script {
     @Override
     public int[] regionsToPrioritise() {
         // Return all possible region IDs based on creature type
-        if ("Birds".equals(selectedTarget)) {
+        String targetLower = selectedTarget != null ? selectedTarget.toLowerCase() : "";
+        
+        // Check if it's a bird type
+        if (targetLower.contains("swift") || targetLower.contains("longtail") || 
+            targetLower.contains("wagtail") || targetLower.contains("twitch")) {
             return HunterLocationConstants.BIRD_REGIONS;
-        } else if ("Chinchompas".equals(selectedTarget)) {
+        } 
+        // Check if it's a chinchompa type
+        else if (targetLower.contains("chinchompa")) {
             return HunterLocationConstants.CHINCHOMPA_REGIONS;
         }
         return new int[] {}; // Return empty array if no target selected
@@ -615,7 +617,7 @@ public class JorkHunter extends Script {
     }
 
     @Override
-    public void onPaint(Canvas canvas) {
+    protected void onMetricsPaint(Canvas canvas) {
         try {
             // Only draw debug visuals if we're initialized and have a hunting task
             if (!initialised || huntTask == null) {
@@ -856,6 +858,58 @@ public class JorkHunter extends Script {
     public HuntingConfig getHuntingConfig() {
         return huntingConfig;
     }
-
+    
+    /**
+     * Initializes the metrics tracking system
+     */
+    private void initializeMetrics() {
+        // Enable Hunter XP tracking with sprite ID 220
+        enableXPTracking(SkillType.HUNTER, 220);
+        
+        // Register custom metrics
+        registerMetric("Total Catches", successfulCatches::get, MetricType.NUMBER);
+        registerMetric("Total Misses", failedCatches::get, MetricType.NUMBER);
+        registerMetric("Caught /h", successfulCatches::get, MetricType.RATE);
+        registerMetric("Missed /h", failedCatches::get, MetricType.RATE);
+        registerMetric("Success Rate", this::calculateSuccessRate, MetricType.PERCENTAGE);
+        registerMetric("Total Checked", totalChecks::get, MetricType.NUMBER);
+    }
+    
+    /**
+     * Calculates the success rate percentage
+     */
+    private double calculateSuccessRate() {
+        int total = successfulCatches.get() + failedCatches.get();
+        if (total == 0) return 0.0;
+        return (successfulCatches.get() * 100.0) / total;
+    }
+    
+    /**
+     * Called when a trap successfully catches something
+     */
+    public void onTrapSuccess() {
+        successfulCatches.incrementAndGet();
+        totalChecks.incrementAndGet();
+        // XP tracking is now handled automatically by OCR-based XPMetricProvider
+    }
+    
+    /**
+     * Called when a trap fails to catch
+     */
+    public void onTrapFailed() {
+        failedCatches.incrementAndGet();
+        totalChecks.incrementAndGet();
+    }
+    
+    /**
+     * Creates the metrics panel configuration
+     */
+    @Override
+    protected MetricsPanelConfig createMetricsConfig() {
+        MetricsPanelConfig config = MetricsPanelConfig.darkTheme();
+        config.setCustomPosition(10, 110);
+        config.setMinWidth(180);
+        return config;
+    }
 
 } 

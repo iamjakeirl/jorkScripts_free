@@ -53,23 +53,40 @@ public class ScriptOptions extends VBox {
         setMinWidth(320);
         setPrefWidth(350);
 
-        // ── Target selection (based on enabled trap types) ──────
-        Label targetLbl      = new Label("Select target:");
+        // ── Target selection (specific creatures for XP tracking) ──────
+        Label targetLbl      = new Label("Select creature:");
         targetLbl.setMinWidth(120);
         targetDropdown       = new ComboBox<>();
         
-        // Add targets based on enabled trap types in config
+        // Add specific creatures based on enabled trap types in config
         if (config.isTypeEnabled(TrapType.BIRD_SNARE)) {
-            targetDropdown.getItems().add("Birds");
+            targetDropdown.getItems().addAll(
+                "Crimson Swift",
+                "Copper Longtail", 
+                "Tropical Wagtail",
+                "Cerulean Twitch"
+            );
         }
         if (config.isTypeEnabled(TrapType.CHINCHOMPA)) {
-            targetDropdown.getItems().add("Chinchompas");
+            targetDropdown.getItems().addAll(
+                "Grey Chinchompa",
+                "Red Chinchompa",
+                "Black Chinchompa"
+            );
         }
         
-        // If it's the "all features" variant, show both
+        // If it's the "all features" variant, show all creatures
         if (config.isAllFeaturesEnabled()) {
             targetDropdown.getItems().clear();
-            targetDropdown.getItems().addAll("Birds", "Chinchompas");
+            targetDropdown.getItems().addAll(
+                "Crimson Swift",
+                "Copper Longtail",
+                "Tropical Wagtail", 
+                "Cerulean Twitch",
+                "Grey Chinchompa",
+                "Red Chinchompa",
+                "Black Chinchompa"
+            );
         }
         
         targetDropdown.getSelectionModel().selectFirst();
