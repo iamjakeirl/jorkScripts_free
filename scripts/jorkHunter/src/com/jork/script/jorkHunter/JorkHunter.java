@@ -909,6 +909,17 @@ public class JorkHunter extends AbstractMetricsScript {
         MetricsPanelConfig config = MetricsPanelConfig.darkTheme();
         config.setCustomPosition(10, 110);
         config.setMinWidth(180);
+        
+        // Set pure black background
+        config.setBackgroundColor(new java.awt.Color(0, 0, 0, 220)); // Black with slight transparency
+        
+        // Add logo image - try as resource name that will be in JAR
+        config.setLogoImage("jorkhunter_logo.png", 30);  // Reduced size to fit within panel
+        config.setLogoOpacity(1.0);
+        
+        // Disable text overlay since we're using pure black
+        config.setUseTextOverlay(false);
+        
         return config;
     }
 

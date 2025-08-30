@@ -2,8 +2,10 @@ package com.jork.utils.metrics.display;
 
 import com.osmb.api.visual.drawing.Canvas;
 import com.jork.utils.metrics.core.MetricType;
+import com.jork.utils.ScriptLogger;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.List;
 
 /**
@@ -15,6 +17,13 @@ public class MetricsDisplay {
     private long creationTime;
     private int lastPanelWidth = 0;
     private int lastPanelHeight = 0;
+    
+    // Cached images
+    private BufferedImage backgroundImage = null;
+    private BufferedImage logoImage = null;
+    private boolean imagesLoaded = false;
+    private String lastBackgroundPath = null;
+    private String lastLogoPath = null;
     
     public MetricsDisplay(MetricsPanelConfig config) {
         this.config = config;
@@ -44,6 +53,9 @@ public class MetricsDisplay {
             return;
         }
         
+        // Ensure images are loaded if configured
+        ensureImagesLoaded(config);
+        
         // Calculate panel dimensions
         Dimension panelSize = calculatePanelSize(canvas, metrics);
         int panelWidth = panelSize.width;
@@ -67,9 +79,34 @@ public class MetricsDisplay {
             }
         }
         
-        // Draw background
+        // Draw background (image or solid)
         if (config.isShowBackground()) {
-            drawBackground(canvas, x, y, panelWidth, panelHeight, opacity);
+            if (config.isUsingImageBackground() && backgroundImage != null) {
+                // Reload background if panel size changed significantly
+                if (Math.abs(panelWidth - backgroundImage.getWidth()) > 10 || 
+                    Math.abs(panelHeight - backgroundImage.getHeight()) > 10) {
+                    backgroundImage = MetricsImageLoader.loadAndResize(
+                        config.getBackgroundImagePath(),
+                        panelWidth,
+                        panelHeight,
+                        config.getBackgroundScaleMode()
+                    );
+                }
+                
+                if (backgroundImage != null) {
+                    drawBackgroundImage(canvas, backgroundImage, x, y, 
+                                      config.getBackgroundImageOpacity() * opacity);
+                    
+                    // Add text overlay for readability
+                    if (config.isUseTextOverlay()) {
+                        Color overlayColor = config.getTextOverlayColor();
+                        canvas.fillRect(x, y, panelWidth, panelHeight, 
+                                      overlayColor.getRGB(), overlayColor.getAlpha() / 255.0 * opacity);
+                    }
+                }
+            } else {
+                drawBackground(canvas, x, y, panelWidth, panelHeight, opacity);
+            }
         }
         
         // Draw border
@@ -77,8 +114,47 @@ public class MetricsDisplay {
             drawBorder(canvas, x, y, panelWidth, panelHeight, opacity);
         }
         
+        // Calculate metrics start position (after logo if present)
+        int metricsStartY = y;
+        
+        // Draw logo at top if configured
+        if (logoImage != null) {
+            // Ensure logo fits within panel with 10px padding on each side
+            int maxLogoWidth = panelWidth - 20; // 10px padding on each side
+            
+            // Check if logo needs to be resized to fit
+            if (logoImage.getWidth() > maxLogoWidth) {
+                // Recalculate logo size to fit within bounds
+                float scale = (float) maxLogoWidth / logoImage.getWidth();
+                int newHeight = Math.round(logoImage.getHeight() * scale);
+                
+                // Reload logo with constrained size
+                logoImage = MetricsImageLoader.loadAndResize(
+                    config.getLogoImagePath(),
+                    maxLogoWidth,
+                    newHeight,
+                    config.getLogoScaleMode()
+                );
+                
+                if (logoImage == null) {
+                    metricsStartY = y + config.getPadding();
+                } else {
+                    int logoX = x + (panelWidth - logoImage.getWidth()) / 2;
+                    int logoY = y + 10; // 10px from top
+                    drawLogo(canvas, logoImage, logoX, logoY, config.getLogoOpacity() * opacity);
+                    metricsStartY = logoY + logoImage.getHeight() + 10; // 10px gap after logo
+                }
+            } else {
+                // Logo fits, center it normally
+                int logoX = x + (panelWidth - logoImage.getWidth()) / 2;
+                int logoY = y + 10; // 10px from top
+                drawLogo(canvas, logoImage, logoX, logoY, config.getLogoOpacity() * opacity);
+                metricsStartY = logoY + logoImage.getHeight() + 10; // 10px gap after logo
+            }
+        }
+        
         // Draw metrics
-        drawMetrics(canvas, metrics, x, y, panelWidth, opacity);
+        drawMetrics(canvas, metrics, x, metricsStartY, panelWidth, opacity);
     }
     
     /**
@@ -90,6 +166,12 @@ public class MetricsDisplay {
         
         int maxWidth = config.getMinWidth();
         int totalHeight = config.getPadding() * 2;
+        
+        // Add logo height if configured
+        if (config.getLogoImagePath() != null) {
+            // Logo height + top padding (10px) + bottom gap (10px)
+            totalHeight += config.getLogoHeight() + 20;
+        }
         
         for (MetricDisplayData metric : metrics) {
             // Calculate width for this metric
@@ -247,5 +329,117 @@ public class MetricsDisplay {
      */
     public int getLastPanelHeight() {
         return lastPanelHeight;
+    }
+    
+    /**
+     * Ensures images are loaded if paths have been configured
+     */
+    private void ensureImagesLoaded(MetricsPanelConfig config) {
+        // Check if paths have changed
+        boolean pathsChanged = false;
+        if (config.getBackgroundImagePath() != null && !config.getBackgroundImagePath().equals(lastBackgroundPath)) {
+            pathsChanged = true;
+            lastBackgroundPath = config.getBackgroundImagePath();
+        }
+        if (config.getLogoImagePath() != null && !config.getLogoImagePath().equals(lastLogoPath)) {
+            pathsChanged = true;
+            lastLogoPath = config.getLogoImagePath();
+        }
+        
+        if (imagesLoaded && !pathsChanged) {
+            return;
+        }
+        
+        // Load background image if configured
+        if (config.getBackgroundImagePath() != null) {
+            try {
+                backgroundImage = MetricsImageLoader.loadAndResize(
+                    config.getBackgroundImagePath(),
+                    config.getMinWidth(),
+                    300, // Estimated initial height
+                    config.getBackgroundScaleMode()
+                );
+            } catch (Exception e) {
+                ScriptLogger.warning(null, "Failed to load background image: " + e.getMessage());
+                backgroundImage = null;
+            }
+        }
+        
+        // Load logo image if configured
+        if (config.getLogoImagePath() != null) {
+            System.out.println("[MetricsDisplay] Logo path configured: " + config.getLogoImagePath());
+            try {
+                logoImage = MetricsImageLoader.loadAndResize(
+                    config.getLogoImagePath(),
+                    -1, // Calculate width from aspect ratio
+                    config.getLogoHeight(),
+                    config.getLogoScaleMode()
+                );
+                if (logoImage != null) {
+                    System.out.println("[MetricsDisplay] Logo loaded successfully: " + logoImage.getWidth() + "x" + logoImage.getHeight());
+                }
+            } catch (Exception e) {
+                System.out.println("[MetricsDisplay] Failed to load logo: " + e.getMessage());
+                e.printStackTrace();
+                ScriptLogger.warning(null, "Failed to load logo image: " + e.getMessage());
+                logoImage = null;
+            }
+        }
+        
+        imagesLoaded = true;
+    }
+    
+    /**
+     * Draws a background image on the canvas
+     */
+    private void drawBackgroundImage(Canvas canvas, BufferedImage image, int x, int y, double opacity) {
+        if (image == null) {
+            return;
+        }
+        
+        int[] pixels = MetricsImageLoader.toPixelArray(image);
+        if (pixels == null) {
+            return;
+        }
+        
+        // Apply opacity to pixels if needed
+        if (opacity < 1.0) {
+            for (int i = 0; i < pixels.length; i++) {
+                int pixel = pixels[i];
+                int alpha = (pixel >> 24) & 0xFF;
+                alpha = (int) (alpha * opacity);
+                pixels[i] = (alpha << 24) | (pixel & 0x00FFFFFF);
+            }
+        }
+        
+        // Draw the image pixels
+        canvas.drawPixels(pixels, x, y, image.getWidth(), image.getHeight());
+    }
+    
+    /**
+     * Draws a logo image on the canvas
+     */
+    private void drawLogo(Canvas canvas, BufferedImage image, int x, int y, double opacity) {
+        if (image == null) {
+            return;
+        }
+        
+        int[] pixels = MetricsImageLoader.toPixelArray(image);
+        if (pixels == null) {
+            return;
+        }
+        
+        // Simple opacity application - no artifact filtering needed since we use black background
+        if (opacity < 1.0) {
+            for (int i = 0; i < pixels.length; i++) {
+                int pixel = pixels[i];
+                int alpha = (pixel >> 24) & 0xFF;
+                alpha = (int) (alpha * opacity);
+                pixels[i] = (alpha << 24) | (pixel & 0x00FFFFFF);
+            }
+        }
+        
+        // Draw the logo pixels
+        canvas.drawPixels(pixels, x, y, image.getWidth(), image.getHeight());
     }
 }

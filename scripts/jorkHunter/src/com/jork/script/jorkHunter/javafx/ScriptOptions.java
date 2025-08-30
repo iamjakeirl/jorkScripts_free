@@ -12,7 +12,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -20,13 +19,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Minimal JavaFX options window for the JorkHunter script.
+ * Modern dark-themed JavaFX options window for the JorkHunter script.
  * Provides configuration options:
  *   – Target (Birds or Chinchompas)
  *   – Placement Strategy (trap placement patterns)
  * Uses TilePicker for hunting location selection in-game.
  */
 public class ScriptOptions extends VBox {
+
+    // Dark theme color constants
+    private static final String DARK_BG = "#1e1e1e";
+    private static final String DARKER_BG = "#161616";
+    private static final String ACCENT_COLOR = "#ff8c42";  // Orange
+    private static final String ACCENT_HOVER = "#ffa05c";  // Lighter orange on hover
+    private static final String TEXT_PRIMARY = "#e4e4e4";
+    private static final String TEXT_SECONDARY = "#999999";
+    private static final String BORDER_COLOR = "#333333";
+    private static final String INPUT_BG = "#2a2a2a";
+    private static final String INPUT_FOCUS = "#363636";
 
     private final ComboBox<String> targetDropdown;
     private final ComboBox<String> strategyDropdown;
@@ -47,16 +57,41 @@ public class ScriptOptions extends VBox {
     
     public ScriptOptions(JorkHunter script, HuntingConfig config) {
         this.config = config;
-        setSpacing(15);
-        setAlignment(Pos.CENTER);
-        setPadding(new Insets(20));
-        setMinWidth(320);
-        setPrefWidth(350);
+        setSpacing(0);
+        setAlignment(Pos.TOP_CENTER);
+        setPadding(new Insets(0));
+        setMinWidth(420);
+        setPrefWidth(450);
+        
+        // Apply dark background to main container
+        setStyle("-fx-background-color: " + DARK_BG + ";");
 
-        // ── Target selection (specific creatures for XP tracking) ──────
-        Label targetLbl      = new Label("Select creature:");
-        targetLbl.setMinWidth(120);
-        targetDropdown       = new ComboBox<>();
+        // ── Header Section ──────────────────────────────────────────
+        Label titleLabel = new Label("JorkHunter Configuration");
+        titleLabel.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + ";");
+        titleLabel.setPadding(new Insets(25, 0, 25, 0));
+        
+        VBox headerBox = new VBox(titleLabel);
+        headerBox.setAlignment(Pos.CENTER);
+        headerBox.setStyle("-fx-background-color: " + DARKER_BG + ";");
+        
+        // ── Main Content Container ──────────────────────────────────
+        VBox contentBox = new VBox(20);
+        contentBox.setPadding(new Insets(25));
+        contentBox.setAlignment(Pos.TOP_LEFT);
+        
+        // ── Target Selection Section ──────────────────────────────────
+        Label targetSectionLabel = new Label("TARGET SELECTION");
+        targetSectionLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_SECONDARY + ";");
+        
+        Label targetLbl = new Label("Creature:");
+        targetLbl.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 13px;");
+        targetLbl.setMinWidth(100);
+        
+        targetDropdown = new ComboBox<>();
+        targetDropdown.setPrefWidth(250);
+        targetDropdown.setStyle(getComboBoxStyle());
+        styleComboBox(targetDropdown);
         
         // Add specific creatures based on enabled trap types in config
         if (config.isTypeEnabled(TrapType.BIRD_SNARE)) {
@@ -90,33 +125,45 @@ public class ScriptOptions extends VBox {
         }
         
         targetDropdown.getSelectionModel().selectFirst();
-        targetDropdown.setPrefWidth(150);
-        HBox targetRow = new HBox(targetLbl, targetDropdown);
-        targetRow.setSpacing(10);
+        
+        HBox targetRow = new HBox(15, targetLbl, targetDropdown);
         targetRow.setAlignment(Pos.CENTER_LEFT);
         
+        VBox targetSection = new VBox(8, targetSectionLabel, targetRow);
+        targetSection.setPadding(new Insets(0, 0, 15, 0));
+        
         // ── Info label about location selection ─────────
-        Label infoLbl = new Label("Location will be selected in-game using tile picker");
-        infoLbl.setStyle("-fx-font-style: italic; -fx-text-fill: #666;");
+        Label infoLbl = new Label("ℹ Location will be selected in-game using tile picker");
+        infoLbl.setStyle("-fx-font-style: italic; -fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 11px; " +
+                         "-fx-background-color: " + INPUT_BG + "; -fx-padding: 8; -fx-background-radius: 4;");
         infoLbl.setWrapText(true);
-        infoLbl.setMaxWidth(300);
+        infoLbl.setMaxWidth(Double.MAX_VALUE);
 
-        // ── Placement Strategy selection ─────────────────────
-        Label strategyLbl = new Label("Placement strategy:");
-        strategyLbl.setMinWidth(120);
-        strategyDropdown  = new ComboBox<>();
+        // ── Placement Strategy Section ─────────────────────
+        Label strategySectionLabel = new Label("PLACEMENT STRATEGY");
+        strategySectionLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_SECONDARY + ";");
+        
+        Label strategyLbl = new Label("Pattern:");
+        strategyLbl.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 13px;");
+        strategyLbl.setMinWidth(100);
+        
+        strategyDropdown = new ComboBox<>();
         strategyDropdown.getItems().addAll("Auto", "X-Pattern", "L-Pattern", "Line", "Cross");
-        strategyDropdown.getSelectionModel().selectFirst();  // Auto is default
-        strategyDropdown.setPrefWidth(150);
-        HBox strategyRow  = new HBox(strategyLbl, strategyDropdown);
-        strategyRow.setSpacing(10);
+        strategyDropdown.getSelectionModel().selectFirst();
+        strategyDropdown.setPrefWidth(250);
+        strategyDropdown.setStyle(getComboBoxStyle());
+        styleComboBox(strategyDropdown);
+        
+        HBox strategyRow = new HBox(15, strategyLbl, strategyDropdown);
         strategyRow.setAlignment(Pos.CENTER_LEFT);
         
         // ── Dynamic Strategy Options Container ────────────
-        strategyOptionsContainer = new VBox(8);
+        strategyOptionsContainer = new VBox(10);
         strategyOptionsContainer.setAlignment(Pos.CENTER_LEFT);
-        strategyOptionsContainer.setPadding(new Insets(10, 0, 10, 0));
-        strategyOptionsContainer.setMinHeight(80);
+        strategyOptionsContainer.setPadding(new Insets(10, 0, 0, 0));
+        strategyOptionsContainer.setMinHeight(60);
+        strategyOptionsContainer.setStyle("-fx-background-color: " + INPUT_BG + "; " +
+                                         "-fx-background-radius: 4; -fx-padding: 10;");
         
         // Listen for strategy changes to update options
         strategyDropdown.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -125,41 +172,77 @@ public class ScriptOptions extends VBox {
         
         // Initialize with default strategy options
         updateStrategyOptions(strategyDropdown.getValue());
+        
+        VBox strategySection = new VBox(8, strategySectionLabel, strategyRow, strategyOptionsContainer);
+        strategySection.setPadding(new Insets(0, 0, 15, 0));
 
-        // ── Manual Hunter Level ───────────────────────────
+        // ── Advanced Options Section ───────────────────────────
+        Label advancedSectionLabel = new Label("ADVANCED OPTIONS");
+        advancedSectionLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_SECONDARY + ";");
+        
+        // Manual Hunter Level
         manualLevelCheck = new CheckBox("Enter hunter level manually");
+        manualLevelCheck.setStyle(getCheckBoxStyle());
+        
         levelInput = new TextField();
         levelInput.setPromptText("Level 1-99");
+        levelInput.setPrefWidth(100);
+        levelInput.setStyle(getTextFieldStyle());
         levelInput.setDisable(true);
-        manualLevelCheck.selectedProperty().addListener((obs, o, n) -> levelInput.setDisable(!n));
+        manualLevelCheck.selectedProperty().addListener((obs, o, n) -> {
+            levelInput.setDisable(!n);
+            if (n) levelInput.requestFocus();
+        });
         
-        // ── Expedite Collection Settings ─────────────────
+        HBox levelRow = new HBox(10, manualLevelCheck, levelInput);
+        levelRow.setAlignment(Pos.CENTER_LEFT);
+        
+        // Expedite Collection Settings
         expediteCollectionCheck = new CheckBox("Expedite trap collection before breaks");
+        expediteCollectionCheck.setStyle(getCheckBoxStyle());
         expediteCollectionCheck.setSelected(false);
         
         Label chanceLabel = new Label("Chance:");
+        chanceLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;");
+        
         expediteChanceInput = new TextField("50");
         expediteChanceInput.setPromptText("0-100");
         expediteChanceInput.setPrefWidth(60);
+        expediteChanceInput.setStyle(getTextFieldStyle());
         expediteChanceInput.setDisable(true);
+        
         Label percentLabel = new Label("%");
+        percentLabel.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 12px;");
         
         // Enable/disable chance input based on checkbox
         expediteCollectionCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
             expediteChanceInput.setDisable(!newVal);
             if (!newVal) {
                 expediteChanceInput.setText("50");
+            } else {
+                expediteChanceInput.requestFocus();
             }
         });
         
-        HBox expediteRow = new HBox(10);
-        expediteRow.setAlignment(Pos.CENTER_LEFT);
-        expediteRow.getChildren().addAll(expediteCollectionCheck, chanceLabel, expediteChanceInput, percentLabel);
+        HBox chanceBox = new HBox(8, chanceLabel, expediteChanceInput, percentLabel);
+        chanceBox.setAlignment(Pos.CENTER_LEFT);
+        chanceBox.setPadding(new Insets(0, 0, 0, 25));
+        
+        VBox expediteBox = new VBox(8, expediteCollectionCheck, chanceBox);
+        
+        VBox advancedSection = new VBox(12, advancedSectionLabel, levelRow, expediteBox);
+        advancedSection.setPadding(new Insets(0, 0, 20, 0));
 
-        // ── Confirm button ─────────────────────────────────
-        confirmBtn = new Button("Start");
-        confirmBtn.setPrefWidth(100);
-        confirmBtn.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        // ── Action Button Section ─────────────────────────────────
+        confirmBtn = new Button("Start Hunting");
+        confirmBtn.setPrefWidth(150);
+        confirmBtn.setPrefHeight(40);
+        confirmBtn.setStyle(getButtonStyle());
+        
+        // Add hover effect
+        confirmBtn.setOnMouseEntered(e -> confirmBtn.setStyle(getButtonHoverStyle()));
+        confirmBtn.setOnMouseExited(e -> confirmBtn.setStyle(getButtonStyle()));
+        
         confirmBtn.setOnAction(e -> {
             saveStrategyOptions();
             ((Stage) getScene().getWindow()).close(); 
@@ -182,8 +265,123 @@ public class ScriptOptions extends VBox {
             );
         });
 
-        getChildren().addAll(targetRow, infoLbl, strategyRow, strategyOptionsContainer, 
-                            manualLevelCheck, levelInput, expediteRow, confirmBtn);
+        // Add all sections to content box
+        contentBox.getChildren().addAll(
+            targetSection,
+            infoLbl,
+            strategySection,
+            advancedSection
+        );
+        
+        // Button container with proper vertical centering
+        VBox buttonContainer = new VBox(confirmBtn);
+        buttonContainer.setAlignment(Pos.CENTER);
+        buttonContainer.setPadding(new Insets(20, 25, 20, 25));  // Equal top/bottom padding for vertical centering
+        buttonContainer.setStyle("-fx-background-color: " + DARKER_BG + ";");
+        
+        // Add all to main container
+        getChildren().addAll(headerBox, contentBox, buttonContainer);
+    }
+    
+    /**
+     * Gets the CSS style for combo boxes
+     */
+    private String getComboBoxStyle() {
+        return "-fx-background-color: " + INPUT_BG + "; " +
+               "-fx-text-fill: " + TEXT_PRIMARY + "; " +
+               "-fx-border-color: " + BORDER_COLOR + "; " +
+               "-fx-border-radius: 4; " +
+               "-fx-background-radius: 4; " +
+               "-fx-font-size: 12px; " +
+               "-fx-control-inner-background: " + INPUT_BG + "; " +
+               "-fx-control-inner-background-alt: " + INPUT_FOCUS + "; " +
+               "-fx-selection-bar: " + ACCENT_COLOR + "; " +
+               "-fx-selection-bar-text: white;";
+    }
+    
+    /**
+     * Gets the CSS style for text fields
+     */
+    private String getTextFieldStyle() {
+        return "-fx-background-color: " + INPUT_BG + "; " +
+               "-fx-text-fill: " + TEXT_PRIMARY + "; " +
+               "-fx-border-color: " + BORDER_COLOR + "; " +
+               "-fx-border-radius: 4; " +
+               "-fx-background-radius: 4; " +
+               "-fx-font-size: 12px; " +
+               "-fx-prompt-text-fill: " + TEXT_SECONDARY + ";";
+    }
+    
+    /**
+     * Gets the CSS style for checkboxes
+     */
+    private String getCheckBoxStyle() {
+        return "-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;";
+    }
+    
+    /**
+     * Gets the CSS style for the primary button
+     */
+    private String getButtonStyle() {
+        return "-fx-background-color: " + ACCENT_COLOR + "; " +
+               "-fx-text-fill: white; " +
+               "-fx-font-size: 14px; " +
+               "-fx-font-weight: bold; " +
+               "-fx-background-radius: 6; " +
+               "-fx-cursor: hand;";
+    }
+    
+    /**
+     * Gets the CSS style for the primary button on hover
+     */
+    private String getButtonHoverStyle() {
+        return "-fx-background-color: " + ACCENT_HOVER + "; " +
+               "-fx-text-fill: white; " +
+               "-fx-font-size: 14px; " +
+               "-fx-font-weight: bold; " +
+               "-fx-background-radius: 6; " +
+               "-fx-cursor: hand;";
+    }
+    
+    /**
+     * Applies custom styling to ComboBox cells for better dark theme support
+     */
+    private void styleComboBox(ComboBox<String> comboBox) {
+        // Style the button cell (displayed item)
+        comboBox.setButtonCell(new javafx.scene.control.ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    setStyle("-fx-text-fill: " + TEXT_PRIMARY + ";");
+                }
+            }
+        });
+        
+        // Style the dropdown list cells
+        comboBox.setCellFactory(listView -> new javafx.scene.control.ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; " +
+                            "-fx-background-color: " + INPUT_BG + ";");
+                    
+                    // Hover effect
+                    setOnMouseEntered(e -> setStyle("-fx-text-fill: white; " +
+                            "-fx-background-color: " + ACCENT_COLOR + ";"));
+                    setOnMouseExited(e -> setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; " +
+                            "-fx-background-color: " + INPUT_BG + ";"));
+                }
+            }
+        });
     }
     
     /**
@@ -195,15 +393,19 @@ public class ScriptOptions extends VBox {
         
         if ("Line".equals(strategyName)) {
             // Add Line-specific options
-            Label optionsLabel = new Label("Line Pattern Options:");
-            optionsLabel.setStyle("-fx-font-weight: bold");
+            Label optionsLabel = new Label("Line Pattern Options");
+            optionsLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;");
             
             Label orientationLabel = new Label("Orientation:");
-            orientationLabel.setMinWidth(80);
+            orientationLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 11px;");
+            orientationLabel.setMinWidth(70);
+            
             lineOrientationDropdown = new ComboBox<>();
             lineOrientationDropdown.getItems().addAll("Horizontal", "Vertical");
             lineOrientationDropdown.getSelectionModel().selectFirst();
-            lineOrientationDropdown.setPrefWidth(120);
+            lineOrientationDropdown.setPrefWidth(140);
+            lineOrientationDropdown.setStyle(getComboBoxStyle());
+            styleComboBox(lineOrientationDropdown);
             
             HBox orientationRow = new HBox(10, orientationLabel, lineOrientationDropdown);
             orientationRow.setAlignment(Pos.CENTER_LEFT);
@@ -213,25 +415,25 @@ public class ScriptOptions extends VBox {
             );
         } else if ("Auto".equals(strategyName)) {
             // Show info about Auto mode
-            Label infoLabel = new Label("Auto Mode");
-            infoLabel.setStyle("-fx-font-weight: bold");
+            Label infoLabel = new Label("Automatic Pattern Selection");
+            infoLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;");
             
             Label descLabel = new Label("Automatically selects optimal pattern:\n" +
                                       "• 1-2 traps: Line\n" +
                                       "• 3 traps: L-Pattern\n" + 
                                       "• 4 traps: Cross\n" +
                                       "• 5 traps: X-Pattern");
-            descLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #666;");
+            descLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
             descLabel.setWrapText(true);
             
             strategyOptionsContainer.getChildren().addAll(infoLabel, descLabel);
         } else {
             // For other patterns, just show a simple description
             Label infoLabel = new Label(strategyName + " Pattern");
-            infoLabel.setStyle("-fx-font-weight: bold");
+            infoLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;");
             
             Label noteLabel = new Label("Will use custom center selected in-game");
-            noteLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #777;");
+            noteLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
             
             strategyOptionsContainer.getChildren().addAll(infoLabel, noteLabel);
         }
@@ -312,13 +514,14 @@ public class ScriptOptions extends VBox {
     public static ScriptOptions showAndWait(JorkHunter script, HuntingConfig config) {
         ScriptOptions pane = new ScriptOptions(script, config);
         Scene scene        = new Scene(pane);
+        scene.setFill(javafx.scene.paint.Color.web(DARK_BG));
         Stage stage        = new Stage();
-        stage.setTitle("JorkHunter – Options");
+        stage.setTitle("JorkHunter – Configuration");
         stage.setScene(scene);
-        stage.setMinWidth(380);
-        stage.setMinHeight(400);
-        stage.setWidth(400);
-        stage.setHeight(420);
+        stage.setMinWidth(450);
+        stage.setMinHeight(520);
+        stage.setWidth(470);
+        stage.setHeight(540);
         stage.setResizable(false);  // Prevent resizing for consistent appearance
         stage.showAndWait();
         return pane;

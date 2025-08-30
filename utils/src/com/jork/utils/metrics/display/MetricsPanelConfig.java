@@ -60,6 +60,20 @@ public class MetricsPanelConfig {
     private boolean fadeIn = true;
     private long fadeInDuration = 500; // milliseconds
     
+    // Image configuration
+    private String backgroundImagePath = null;
+    private String logoImagePath = null;
+    private MetricsImageLoader.ScaleMode backgroundScaleMode = MetricsImageLoader.ScaleMode.STRETCH;
+    private MetricsImageLoader.ScaleMode logoScaleMode = MetricsImageLoader.ScaleMode.FIT;
+    private int logoHeight = 30;  // Target height for logo
+    private boolean useImageBackground = false;
+    private double backgroundImageOpacity = 0.8;
+    private double logoOpacity = 1.0;
+    
+    // Text overlay for readability over images
+    private boolean useTextOverlay = true;
+    private Color textOverlayColor = new Color(0, 0, 0, 100); // 40% black
+    
     // Getters and setters
     
     public Position getPosition() {
@@ -238,6 +252,100 @@ public class MetricsPanelConfig {
     
     public void setFadeInDuration(long fadeInDuration) {
         this.fadeInDuration = fadeInDuration;
+    }
+    
+    // Image-related getters and setters
+    
+    public String getBackgroundImagePath() {
+        return backgroundImagePath;
+    }
+    
+    public void setBackgroundImage(String path) {
+        this.backgroundImagePath = path;
+        this.useImageBackground = (path != null && !path.isEmpty());
+    }
+    
+    public void setBackgroundImage(String path, MetricsImageLoader.ScaleMode scaleMode) {
+        this.backgroundImagePath = path;
+        this.backgroundScaleMode = scaleMode;
+        this.useImageBackground = (path != null && !path.isEmpty());
+    }
+    
+    public MetricsImageLoader.ScaleMode getBackgroundScaleMode() {
+        return backgroundScaleMode;
+    }
+    
+    public void setBackgroundScaleMode(MetricsImageLoader.ScaleMode mode) {
+        this.backgroundScaleMode = mode;
+    }
+    
+    public String getLogoImagePath() {
+        return logoImagePath;
+    }
+    
+    public void setLogoImage(String path) {
+        this.logoImagePath = path;
+    }
+    
+    public void setLogoImage(String path, int targetHeight) {
+        this.logoImagePath = path;
+        this.logoHeight = targetHeight;
+    }
+    
+    public MetricsImageLoader.ScaleMode getLogoScaleMode() {
+        return logoScaleMode;
+    }
+    
+    public void setLogoScaleMode(MetricsImageLoader.ScaleMode mode) {
+        this.logoScaleMode = mode;
+    }
+    
+    public int getLogoHeight() {
+        return logoHeight;
+    }
+    
+    public void setLogoHeight(int height) {
+        this.logoHeight = height;
+    }
+    
+    public boolean isUsingImageBackground() {
+        return useImageBackground && backgroundImagePath != null;
+    }
+    
+    public void useColorBackground() {
+        this.useImageBackground = false;
+    }
+    
+    public double getBackgroundImageOpacity() {
+        return backgroundImageOpacity;
+    }
+    
+    public void setBackgroundImageOpacity(double opacity) {
+        this.backgroundImageOpacity = Math.max(0.0, Math.min(1.0, opacity));
+    }
+    
+    public double getLogoOpacity() {
+        return logoOpacity;
+    }
+    
+    public void setLogoOpacity(double opacity) {
+        this.logoOpacity = Math.max(0.0, Math.min(1.0, opacity));
+    }
+    
+    public boolean isUseTextOverlay() {
+        return useTextOverlay;
+    }
+    
+    public void setUseTextOverlay(boolean useOverlay) {
+        this.useTextOverlay = useOverlay;
+    }
+    
+    public Color getTextOverlayColor() {
+        return textOverlayColor;
+    }
+    
+    public void setTextOverlayColor(Color color) {
+        this.textOverlayColor = color;
     }
     
     /**
