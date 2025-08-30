@@ -4,7 +4,7 @@ import com.jork.script.jorkHunter.JorkHunter;
 import com.jork.utils.ScriptLogger;
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.location.area.impl.RectangleArea;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.util.*;
 
@@ -74,7 +74,7 @@ public class LPatternStrategy implements TrapPlacementStrategy {
         
         // If multiple positions at same distance, pick randomly
         if (equalDistancePositions.size() > 1) {
-            int randomIndex = Utils.random(0, equalDistancePositions.size() - 1);
+            int randomIndex = RandomUtils.uniformRandom(0, equalDistancePositions.size() - 1);
             nearestPosition = equalDistancePositions.get(randomIndex);
         }
         
@@ -123,7 +123,7 @@ public class LPatternStrategy implements TrapPlacementStrategy {
             currentPattern.add(new WorldPosition(x + 1, y, plane));     // East
         } else if (maxTraps == 4) {
             // Extended L: randomly choose to extend north or east more
-            if (Utils.random(0, 1) == 0) {
+            if (RandomUtils.uniformRandom(0, 1) == 0) {
                 // Extend north leg more
                 currentPattern.add(new WorldPosition(x, y + 1, plane));     // North 1
                 currentPattern.add(new WorldPosition(x, y + 2, plane));     // North 2

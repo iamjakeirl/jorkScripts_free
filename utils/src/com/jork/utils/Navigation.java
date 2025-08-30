@@ -4,8 +4,9 @@ import com.osmb.api.location.area.Area;
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.script.Script;
 import com.osmb.api.walker.WalkConfig;
-import com.osmb.api.scene.RSTile;
 import com.osmb.api.shape.Polygon;
+import com.osmb.api.scene.RSTile;
+import com.osmb.api.utils.RandomUtils;
 
 import java.awt.Point;
 import java.util.List;
@@ -209,7 +210,7 @@ public class Navigation {
                 }
                 
                 // Human reaction to failed tap - would take time to notice and retry
-                script.submitHumanTask(() -> true, com.osmb.api.utils.Utils.random(600, 1200));
+                script.submitHumanTask(() -> true, RandomUtils.weightedRandom(600, 1200));
                 continue;
             }
 
@@ -249,7 +250,7 @@ public class Navigation {
                 ScriptLogger.debug(script, "Simple movement completed on attempt " + attempt);
                 
                 // Human would take a moment to recognize arrival
-                script.submitHumanTask(() -> true, com.osmb.api.utils.Utils.random(200, 400));
+                script.submitHumanTask(() -> true, RandomUtils.weightedRandom(200, 400));
                 return true;
             }
             
@@ -260,7 +261,7 @@ public class Navigation {
                                  finalPos + " (target: " + targetPosition + ")");
                 
                 // Human reaction to recognizing we stopped at wrong place
-                script.submitHumanTask(() -> true, com.osmb.api.utils.Utils.random(400, 800));
+                script.submitHumanTask(() -> true, RandomUtils.weightedRandom(400, 800));
                 continue; // Retry
             }
             

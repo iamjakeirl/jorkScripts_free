@@ -5,7 +5,7 @@ import com.jork.script.jorkHunter.tasks.TrapTask;
 import com.jork.utils.ScriptLogger;
 import com.osmb.api.location.area.impl.RectangleArea;
 import com.osmb.api.location.position.types.WorldPosition;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.awt.Point;
 import java.util.ArrayList;
@@ -135,7 +135,7 @@ public class XPatternStrategy implements TrapPlacementStrategy {
         
         // If multiple positions at same distance, pick randomly for human-like variation
         if (equalDistancePositions.size() > 1) {
-            int randomIndex = Utils.random(0, equalDistancePositions.size() - 1);
+            int randomIndex = RandomUtils.uniformRandom(0, equalDistancePositions.size() - 1);
             nearestPosition = equalDistancePositions.get(randomIndex);
             ScriptLogger.debug(script, "Multiple positions at distance " + nearestDistance + 
                              ", randomly selected: " + nearestPosition);
@@ -198,8 +198,8 @@ public class XPatternStrategy implements TrapPlacementStrategy {
         }
         
         // Pick random offset within maxCenterDistance
-        int xOffset = Utils.random(-maxCenterDistance, maxCenterDistance);
-        int yOffset = Utils.random(-maxCenterDistance, maxCenterDistance);
+        int xOffset = RandomUtils.uniformRandom(-maxCenterDistance, maxCenterDistance);
+        int yOffset = RandomUtils.uniformRandom(-maxCenterDistance, maxCenterDistance);
         
         int centerX = areaCenter.getX() + xOffset;
         int centerY = areaCenter.getY() + yOffset;
@@ -264,11 +264,11 @@ public class XPatternStrategy implements TrapPlacementStrategy {
         };
         
         // Randomly select starting corner
-        int firstCorner = Utils.random(0, 3);
+        int firstCorner = RandomUtils.uniformRandom(0, 3);
         
         // Select an adjacent corner as second
         int[] adjacentOptions = adjacentCorners[firstCorner];
-        int secondCorner = adjacentOptions[Utils.random(0, adjacentOptions.length - 1)];
+        int secondCorner = adjacentOptions[RandomUtils.uniformRandom(0, adjacentOptions.length - 1)];
         
         // Determine remaining corners
         List<Integer> cornerOrder = new ArrayList<>();

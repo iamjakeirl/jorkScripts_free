@@ -13,7 +13,7 @@ import com.osmb.api.shape.Polygon;
 import com.osmb.api.shape.Rectangle;
 import com.osmb.api.scene.RSTile;
 import com.osmb.api.visual.PixelCluster.ClusterSearchResult;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 import com.osmb.api.input.MenuEntry;
 
 import java.util.List;
@@ -511,7 +511,7 @@ public class TrapInteractionHandler implements InteractionHandler {
                             // If no "take" option, fall through to try other actions
                         } else {
                             // Normal mode: 85% chance to prefer "lay", 15% chance to prefer "take"
-                            boolean preferLay = Utils.random(1, 100) <= 85;
+                            boolean preferLay = RandomUtils.uniformRandom(1, 100) <= 85;
                             String preferredAction = preferLay ? "lay" : "take";
                             
                             // First try to find the preferred action
@@ -588,7 +588,7 @@ public class TrapInteractionHandler implements InteractionHandler {
                     
                     // Only return null if menu is completely empty (very rare)
                     return null;
-                }), Utils.random(2900, 3400));
+                }), RandomUtils.uniformRandom(2900, 3400));
             
             // Check if we selected cancel (meaning we missed the trap)
             cancelSelected = selectedAction[0] != null && selectedAction[0].equals("cancel");
@@ -608,7 +608,7 @@ public class TrapInteractionHandler implements InteractionHandler {
             // If this was the first attempt and we selected cancel, retry with fresh TileCube
             if (attempt == 1 && cancelSelected) {
                 ScriptLogger.info(script, "First tap missed trap at " + position + ", recalculating TileCube for retry...");
-                script.sleep(Utils.random(200, 400)); // Brief pause before retry
+                script.sleep(RandomUtils.weightedRandom(200, 400)); // Brief pause before retry
                 continue; // Continue to attempt 2
             }
             
@@ -685,7 +685,7 @@ public class TrapInteractionHandler implements InteractionHandler {
                         // If no "take" option, fall through to try other actions
                     } else {
                         // Normal mode: 85% chance to prefer "lay", 15% chance to prefer "take"
-                        boolean preferLay = Utils.random(1, 100) <= 85;
+                        boolean preferLay = RandomUtils.uniformRandom(1, 100) <= 85;
                         String preferredAction = preferLay ? "lay" : "take";
                         
                         // First try to find the preferred action
@@ -736,7 +736,7 @@ public class TrapInteractionHandler implements InteractionHandler {
                     }
                 }
                 return null;
-            }), Utils.random(2900, 3400));
+            }), RandomUtils.uniformRandom(2900, 3400));
         
         if (interacted) {
             InteractionResult.InteractionType type = determineInteractionType(state, selectedAction[0]);

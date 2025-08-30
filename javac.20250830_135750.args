@@ -1,0 +1,4 @@
+-Xlint:deprecation
+-cp
+"$(ls scripts/jorkHunter/jar/*.jar | head -1)"
+scripts/jorkHunter/src/com/jork/script/jorkHunter/state/TrapStateManager.java

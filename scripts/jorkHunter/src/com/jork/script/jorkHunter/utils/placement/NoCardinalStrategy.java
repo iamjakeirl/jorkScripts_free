@@ -2,7 +2,7 @@ package com.jork.script.jorkHunter.utils.placement;
 
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.location.area.impl.RectangleArea;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -151,7 +151,7 @@ public class NoCardinalStrategy implements TrapPlacementStrategy {
         }
         
         // Pick a random zone
-        RectangleArea randomZone = huntingZones.get(Utils.random(0, huntingZones.size() - 1));
+        RectangleArea randomZone = huntingZones.get(RandomUtils.uniformRandom(0, huntingZones.size() - 1));
         return randomZone.getRandomPosition();
     }
     

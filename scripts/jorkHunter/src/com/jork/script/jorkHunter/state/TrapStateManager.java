@@ -13,7 +13,7 @@ import com.osmb.api.visual.SearchablePixel;
 import com.osmb.api.shape.Polygon;
 import com.osmb.api.scene.RSTile;
 import com.osmb.api.visual.PixelCluster.ClusterSearchResult;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 import com.osmb.api.input.MenuHook;
 import com.osmb.api.input.MenuEntry;
 import com.osmb.api.item.ItemID;
@@ -310,10 +310,10 @@ public class TrapStateManager {
                 long gracePeriod;
                 if (trapType == TrapType.BIRD_SNARE && isYellow(previous)) {
                     // Active trap disappearing - use 2-4s to avoid false positives
-                    gracePeriod = Utils.random(2151, 4216);
+                    gracePeriod = RandomUtils.uniformRandom(2151, 4216);
                 } else {
                     // Finished traps or animation transitions might take longer
-                    gracePeriod = Utils.random(2251, 4117);
+                    gracePeriod = RandomUtils.uniformRandom(2251, 4117);
                 }
                 trapGracePeriods.put(pos, gracePeriod);
                 String stateDesc = previous.toString().toUpperCase();
@@ -1065,7 +1065,7 @@ public class TrapStateManager {
             }
             
             // Final tie-breaker: Random selection for identical cases
-            return Utils.random(0, 1) == 0 ? -1 : 1;
+            return RandomUtils.uniformRandom(0, 1) == 0 ? -1 : 1;
         });
         
         // Return the best trap (first in sorted list)

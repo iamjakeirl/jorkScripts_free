@@ -13,6 +13,43 @@ import com.osmb.api.script.Script;
  * @author jork
  */
 public class ScriptLogger {
+
+    /**
+     * Log levels for global filtering.
+     */
+    public enum Level {
+        ERROR(3),
+        WARNING(2),
+        INFO(1),
+        DEBUG(0);
+        final int priority;
+        Level(int p) { this.priority = p; }
+    }
+
+    /**
+     * Global minimum level to log. Defaults to INFO (DEBUG suppressed).
+     */
+    private static volatile Level minLevel = Level.INFO;
+
+    /**
+     * Set the global minimum level. Messages below this level are suppressed.
+     */
+    public static void setMinLevel(Level level) {
+        if (level != null) {
+            minLevel = level;
+        }
+    }
+
+    /**
+     * Convenience toggle for debug logging.
+     */
+    public static void setDebugEnabled(boolean enabled) {
+        minLevel = enabled ? Level.DEBUG : Level.INFO;
+    }
+
+    private static boolean shouldLog(Level level) {
+        return level.priority >= minLevel.priority;
+    }
     
     /**
      * Private constructor to prevent instantiation of utility class
@@ -27,7 +64,9 @@ public class ScriptLogger {
      * @param message The message to log
      */
     public static void info(Script script, String message) {
-        script.log(script.getClass().getSimpleName(), "[INFO] " + message);
+        if (shouldLog(Level.INFO)) {
+            script.log(script.getClass().getSimpleName(), "[INFO] " + message);
+        }
     }
     
     /**
@@ -36,7 +75,9 @@ public class ScriptLogger {
      * @param message The warning message to log
      */
     public static void warning(Script script, String message) {
-        script.log(script.getClass().getSimpleName(), "[WARNING] " + message);
+        if (shouldLog(Level.WARNING)) {
+            script.log(script.getClass().getSimpleName(), "[WARNING] " + message);
+        }
     }
     
     /**
@@ -45,7 +86,9 @@ public class ScriptLogger {
      * @param message The error message to log
      */
     public static void error(Script script, String message) {
-        script.log(script.getClass().getSimpleName(), "[ERROR] " + message);
+        if (shouldLog(Level.ERROR)) {
+            script.log(script.getClass().getSimpleName(), "[ERROR] " + message);
+        }
     }
     
     /**
@@ -54,7 +97,9 @@ public class ScriptLogger {
      * @param message The debug message to log
      */
     public static void debug(Script script, String message) {
-        script.log(script.getClass().getSimpleName(), "[DEBUG] " + message);
+        if (shouldLog(Level.DEBUG)) {
+            script.log(script.getClass().getSimpleName(), "[DEBUG] " + message);
+        }
     }
     
     /**
@@ -159,7 +204,18 @@ public class ScriptLogger {
      * @param message The message to log
      */
     public static void custom(Script script, String level, String message) {
-        script.log(script.getClass().getSimpleName(), "[" + level.toUpperCase() + "] " + message);
+        // Map known levels to gating; default to INFO
+        String upper = level == null ? "INFO" : level.toUpperCase();
+        Level mapped = switch (upper) {
+            case "ERROR" -> Level.ERROR;
+            case "WARN", "WARNING" -> Level.WARNING;
+            case "INFO" -> Level.INFO;
+            case "DEBUG" -> Level.DEBUG;
+            default -> Level.INFO;
+        };
+        if (shouldLog(mapped)) {
+            script.log(script.getClass().getSimpleName(), "[" + upper + "] " + message);
+        }
     }
     
     /**

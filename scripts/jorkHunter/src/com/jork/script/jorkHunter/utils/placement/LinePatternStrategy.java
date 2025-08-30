@@ -4,7 +4,7 @@ import com.jork.script.jorkHunter.JorkHunter;
 import com.jork.utils.ScriptLogger;
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.location.area.impl.RectangleArea;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.util.*;
 
@@ -43,7 +43,7 @@ public class LinePatternStrategy implements TrapPlacementStrategy {
         
         // If orientation is RANDOM, pick one randomly
         if (orientation == Orientation.RANDOM) {
-            this.orientation = Utils.random(0, 1) == 0 ? Orientation.HORIZONTAL : Orientation.VERTICAL;
+            this.orientation = RandomUtils.uniformRandom(0, 1) == 0 ? Orientation.HORIZONTAL : Orientation.VERTICAL;
             ScriptLogger.debug(script, "Line pattern randomly selected orientation: " + this.orientation);
         } else {
             this.orientation = orientation;
@@ -91,7 +91,7 @@ public class LinePatternStrategy implements TrapPlacementStrategy {
         
         // If multiple positions at same distance, pick randomly
         if (equalDistancePositions.size() > 1) {
-            int randomIndex = Utils.random(0, equalDistancePositions.size() - 1);
+            int randomIndex = RandomUtils.uniformRandom(0, equalDistancePositions.size() - 1);
             nearestPosition = equalDistancePositions.get(randomIndex);
         }
         

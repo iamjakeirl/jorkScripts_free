@@ -45,6 +45,7 @@ public class ScriptOptions extends VBox {
     private final TextField levelInput;
     private final CheckBox expediteCollectionCheck;
     private final TextField expediteChanceInput;
+    private final CheckBox debugLoggingCheck;
     
     // Dynamic strategy options
     private VBox strategyOptionsContainer;
@@ -230,7 +231,12 @@ public class ScriptOptions extends VBox {
         
         VBox expediteBox = new VBox(8, expediteCollectionCheck, chanceBox);
         
-        VBox advancedSection = new VBox(12, advancedSectionLabel, levelRow, expediteBox);
+        // Debug logging toggle
+        debugLoggingCheck = new CheckBox("Enable debug logging");
+        debugLoggingCheck.setStyle(getCheckBoxStyle());
+        debugLoggingCheck.setSelected(false);
+
+        VBox advancedSection = new VBox(12, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck);
         advancedSection.setPadding(new Insets(0, 0, 20, 0));
 
         // ── Action Button Section ─────────────────────────────────
@@ -253,6 +259,8 @@ public class ScriptOptions extends VBox {
             // Add expedite settings to strategy options
             strategyOptions.put("expediteCollection", isExpediteCollectionEnabled());
             strategyOptions.put("expediteChance", getExpediteCollectionChance());
+            // Add debug logging setting
+            strategyOptions.put("debugLogging", isDebugLoggingEnabled());
             
             // Notify the script that settings have been confirmed (FX thread)
             script.onSettingsSelected(
@@ -479,6 +487,13 @@ public class ScriptOptions extends VBox {
         } catch (NumberFormatException e) {
             return -1;
         }
+    }
+
+    /**
+     * Gets whether debug logging is enabled.
+     */
+    public boolean isDebugLoggingEnabled() {
+        return debugLoggingCheck.isSelected();
     }
     
     // Area dropdown removed - using TilePicker for location selection

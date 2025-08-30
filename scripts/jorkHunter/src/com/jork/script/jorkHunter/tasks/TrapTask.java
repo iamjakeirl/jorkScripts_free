@@ -22,7 +22,7 @@ import com.osmb.api.shape.Polygon;
 import com.osmb.api.item.ItemGroupResult;
 import com.osmb.api.item.ItemID;
 import com.osmb.api.item.ItemSearchResult;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 import com.osmb.api.shape.Rectangle;
 import com.osmb.api.scene.RSTile;
 import com.osmb.api.location.area.impl.RectangleArea;
@@ -108,7 +108,7 @@ public class TrapTask extends AbstractHuntingTask {
                 ScriptLogger.warning(script, "No trap position during laying/resetting - clearing flags");
                 trapManager.clearLayingFlag();
                 trapManager.clearResetFlag();
-                return Utils.random(500, 800);
+                return RandomUtils.weightedRandom(500, 800);
             }
             
             // Use submitHumanTask to wait for respawn circle with human reaction time
@@ -146,7 +146,7 @@ public class TrapTask extends AbstractHuntingTask {
                 trapLayingStartPosition = null;
                 trapLayingStartTime = 0;
                 
-                return Utils.random(400, 700);
+                return RandomUtils.weightedRandom(400, 700);
             } else {
                 // Timed out or failed - use movement as fallback
                 ScriptLogger.warning(script, "Respawn circle detection timed out at " + finalTrapPos);
@@ -171,7 +171,7 @@ public class TrapTask extends AbstractHuntingTask {
                             trapLayingStartPosition = null;
                             trapLayingStartTime = 0;
                             
-                            return Utils.random(400, 700);
+                            return RandomUtils.weightedRandom(400, 700);
                         }
                     }
                 }
@@ -187,7 +187,7 @@ public class TrapTask extends AbstractHuntingTask {
                 trapLayingStartPosition = null;
                 trapLayingStartTime = 0;
                 
-                return Utils.random(500, 800);
+                return RandomUtils.weightedRandom(500, 800);
             }
         }
         
@@ -219,7 +219,7 @@ public class TrapTask extends AbstractHuntingTask {
                     } else if (distance > 1.0) {
                         // Still moving to position, don't interrupt
                         ScriptLogger.debug(script, "Still moving to committed trap position at " + committedTrapPosition + " (distance: " + distance + ")");
-                        return Utils.random(200, 400);
+                        return RandomUtils.weightedRandom(200, 400);
                     } else {
                         // We're at the position, continue with trap laying but maintain commitment
                         // This prevents us from walking away before actually laying the trap
@@ -257,7 +257,7 @@ public class TrapTask extends AbstractHuntingTask {
                     int totalTraps = trapManager.getTotalCount();
                     
                     // Use a random threshold between 14-34 seconds for human-like behavior
-                    long freshnessThreshold = Utils.random(14000, 34000);
+                    long freshnessThreshold = RandomUtils.uniformRandom(14000, 34000);
                     
                     // Check if trap is urgent or critical (needs immediate attention)
                     boolean isUrgent = (highestFlag == TrapFlag.NEEDS_INTERACTION && timeInState > 60000) ||
@@ -272,7 +272,7 @@ public class TrapTask extends AbstractHuntingTask {
                         
                         // Skip handling this trap and lay a new one instead
                         layNewTrap();
-                        return Utils.random(100, 200);
+                        return RandomUtils.weightedRandom(100, 200);
                     }
                 }
                 
@@ -293,19 +293,19 @@ public class TrapTask extends AbstractHuntingTask {
                         boolean positionValid = script.submitHumanTask(() -> {
                             Set<WorldPosition> existingTraps = new HashSet<>(trapManager.getLaidTrapPositions());
                             return placementStrategy.isValidPosition(currentPos, existingTraps);
-                        }, Utils.random(300, 600));
+                        }, RandomUtils.weightedRandom(300, 600));
                         
                         if (positionValid) {
                             ScriptLogger.info(script, "Current position is valid for new trap (" + (totalTraps + 1) + "/" + maxTraps + "). Laying trap before handling flagged trap at " + trapToHandle.position());
                             layNewTrap();
-                            return Utils.random(100, 200);
+                            return RandomUtils.weightedRandom(100, 200);
                         }
                     }
                 }
                 
                 // Handle the trap based on its priority flag
                 handleTrap(trapToHandle);
-                return Utils.random(800, 1400); // Brief pause after trap handling
+                return RandomUtils.uniformRandom(800, 1400); // Brief pause after trap handling
             }
         }
 
@@ -343,7 +343,7 @@ public class TrapTask extends AbstractHuntingTask {
                         }
                     }
                     
-                    return Utils.random(800, 1200); // Brief pause after repositioning
+                    return RandomUtils.uniformRandom(800, 1200); // Brief pause after repositioning
                 }
             }
         }
@@ -377,7 +377,7 @@ public class TrapTask extends AbstractHuntingTask {
             // Don't return here - let the script continue to handle existing traps!
         } else if (trapManager.isCurrentlyLayingTrap()) {
             ScriptLogger.debug(script, "Currently laying a trap. Waiting for completion.");
-            return Utils.random(300, 500);
+            return RandomUtils.weightedRandom(300, 500);
         } else {
             // 5. Not draining and not currently laying, so lay new traps if we have space (or if we're committed to laying)
             int totalTraps = trapManager.getTotalCount();
@@ -388,7 +388,7 @@ public class TrapTask extends AbstractHuntingTask {
                     ScriptLogger.info(script, "Trap limit not reached (" + totalTraps + "/" + maxTraps + "). Laying new trap.");
                 }
                 layNewTrap();
-                return Utils.random(100, 200);
+                return RandomUtils.weightedRandom(100, 200);
             }
         }
 
@@ -505,7 +505,7 @@ public class TrapTask extends AbstractHuntingTask {
                     }, 2000);
                     
                     // Brief pause to let pickup animation start
-                    script.sleep(Utils.random(200, 400));
+                    script.sleep(RandomUtils.weightedRandom(200, 400));
                     
                     // The laying detection will be handled by the main execute() loop
                     // similar to normal trap laying
@@ -656,7 +656,7 @@ public class TrapTask extends AbstractHuntingTask {
             committedTrapPosition = targetPos;
             
             // Use simple movement with 0 tolerance for exact trap placement positioning
-            boolean reachedZone = navigation.simpleMoveTo(targetPos, Utils.random(5700, 6400), 0);
+            boolean reachedZone = navigation.simpleMoveTo(targetPos, RandomUtils.uniformRandom(5700, 6400), 0);
             
             if (!reachedZone) {
                 // Check if accidentally reached position is still valid for trap laying
@@ -723,7 +723,7 @@ public class TrapTask extends AbstractHuntingTask {
                         committedTrapPosition = strategicPosition;
                         
                         // Use simple movement with 0 tolerance for exact trap placement positioning
-                        boolean moved = navigation.simpleMoveTo(strategicPosition, Utils.random(3600, 4800), 0);
+                        boolean moved = navigation.simpleMoveTo(strategicPosition, RandomUtils.uniformRandom(3600, 4800), 0);
                         
                         if (!moved) {
                             // Check if current position is still valid for trap laying even if movement "failed"
@@ -774,7 +774,7 @@ public class TrapTask extends AbstractHuntingTask {
         }
         
         // Defensive movement safety check - ensure we're not still moving
-        if (script.getLastPositionChangeMillis() < Utils.random(350, 700)) {
+        if (script.getLastPositionChangeMillis() < RandomUtils.uniformRandom(350, 700)) {
             ScriptLogger.debug(script, "Still moving (last change: " + script.getLastPositionChangeMillis() + "ms ago). Waiting before laying trap.");
             return;
         }
@@ -799,7 +799,7 @@ public class TrapTask extends AbstractHuntingTask {
 
             ItemSearchResult trap = getTrapFromInventory();
             return trap != null && trap.interact(trapType.getInventoryActions()[0]);
-        }, Utils.random(1000, 2000));
+        }, RandomUtils.uniformRandom(1000, 2000));
 
         if (submitted && trapPosition[0] != null) {
             // Clear commitment since we're now actually laying the trap

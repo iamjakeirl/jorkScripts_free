@@ -15,7 +15,7 @@ import com.osmb.api.location.area.impl.RectangleArea;
 import com.osmb.api.item.ItemGroupResult;
 import com.osmb.api.item.ItemSearchResult;
 import com.osmb.api.walker.WalkConfig;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -114,7 +114,7 @@ public abstract class AbstractHuntingTask implements Task {
      */
     protected WorldPosition findSafeRandomPosition(Set<WorldPosition> existingTraps) {
         for (int attempt = 0; attempt < 10; attempt++) {
-            RectangleArea randomZone = huntingZones.get(Utils.random(0, huntingZones.size() - 1));
+            RectangleArea randomZone = huntingZones.get(RandomUtils.uniformRandom(0, huntingZones.size() - 1));
             WorldPosition candidate = randomZone.getRandomPosition();
             
             if (candidate != null && !existingTraps.contains(candidate)) {

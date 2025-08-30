@@ -4,7 +4,7 @@ import com.jork.script.jorkHunter.HuntingLocation;
 import com.jork.script.jorkHunter.JorkHunter;
 import com.jork.script.jorkHunter.utils.tasks.Task;
 import com.osmb.api.script.Script;
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 import com.osmb.api.item.ItemGroupResult;
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.location.area.impl.RectangleArea;
@@ -99,7 +99,7 @@ public class DropTask implements Task {
             // Animation-first: if animating, keep polling quickly
             boolean animating = script.getPixelAnalyzer().isPlayerAnimating(0.4);
             if (animating) {
-                return Utils.random(ANIM_POLL_MIN_MS, ANIM_POLL_MAX_MS);
+                return RandomUtils.weightedRandom(ANIM_POLL_MIN_MS, ANIM_POLL_MAX_MS);
             }
 
             // Not animating: check arrival or away-from-area
@@ -118,25 +118,25 @@ public class DropTask implements Task {
                 // Reset state
                 movingForDrop = false;
                 preMovePosition = null;
-                return Utils.random(300, 600);
+                return RandomUtils.weightedRandom(300, 600);
             }
 
             // Still not there: re-issue movement using simpleMoveTo for retry
             // This will attempt screen tap first, then walker fallback
             WorldPosition dropTarget = new WorldPosition(dropTargetX, dropTargetY, current.getPlane());
-            boolean retrySuccess = navigation.simpleMoveTo(dropTarget, Utils.random(2000, 3000), 0);
+            boolean retrySuccess = navigation.simpleMoveTo(dropTarget, RandomUtils.uniformRandom(2000, 3000), 0);
             
             if (!retrySuccess) {
                 ScriptLogger.warning(script, "Movement retry failed, may be stuck");
             }
-            return Utils.random(250, 450);
+            return RandomUtils.weightedRandom(250, 450);
         }
 
         // We are not moving yet: initiate movement away for drop
         boolean movementStarted = moveAwayForDrop();
         if (movementStarted) {
             // Let the poll loop drive completion
-            return Utils.random(250, 450);
+            return RandomUtils.weightedRandom(250, 450);
         }
 
         // Movement could not be started; drop at current position as a fallback
@@ -144,7 +144,7 @@ public class DropTask implements Task {
         script.getWidgetManager().getInventory().dropItems(itemsToDrop);
         ScriptLogger.debug(script, "Disabling 'Tap to drop' mode as a cleanup step.");
         script.getWidgetManager().getHotkeys().setTapToDropEnabled(false);
-        return Utils.random(300, 600);
+        return RandomUtils.weightedRandom(300, 600);
     }
     
     /**
@@ -165,8 +165,8 @@ public class DropTask implements Task {
         if (dropPosition == null) {
             // Fallback to conservative random movement if smart calculation fails
             ScriptLogger.warning(script, "Smart drop position calculation failed, using fallback");
-            int xOffset = Utils.random(2, 3) * (Utils.random(0, 1) == 0 ? -1 : 1);
-            int yOffset = Utils.random(0, 1) * (Utils.random(0, 1) == 0 ? -1 : 1);
+            int xOffset = RandomUtils.uniformRandom(2, 3) * (RandomUtils.uniformRandom(0, 1) == 0 ? -1 : 1);
+            int yOffset = RandomUtils.uniformRandom(0, 1) * (RandomUtils.uniformRandom(0, 1) == 0 ? -1 : 1);
             dropPosition = new WorldPosition(
                 currentPosition.getX() + xOffset,
                 currentPosition.getY() + yOffset,
@@ -183,7 +183,7 @@ public class DropTask implements Task {
         
         // Use simpleMoveTo with exact precision (0 tolerance) to ensure we actually move
         // This will try screen tapping first, then fall back to walker if needed
-        boolean walkResult = navigation.simpleMoveTo(dropPosition, Utils.random(3000, 4000), 0);
+        boolean walkResult = navigation.simpleMoveTo(dropPosition, RandomUtils.uniformRandom(3000, 4000), 0);
         
         if (!walkResult) {
             ScriptLogger.warning(script, "Failed to initiate movement to drop position");
@@ -221,8 +221,8 @@ public class DropTask implements Task {
         // Handle case where we're using TilePicker and don't have predefined zones
         if (huntingLocation == null) {
             // Create a simple drop position 2-3 tiles away
-            int distance = Utils.random(DROP_DISTANCE_MIN, DROP_DISTANCE_MAX);
-            int angle = Utils.random(0, 360);
+            int distance = RandomUtils.uniformRandom(DROP_DISTANCE_MIN, DROP_DISTANCE_MAX);
+            int angle = RandomUtils.uniformRandom(0, 360);
             int dropX = currentPos.getX() + (int)(distance * Math.cos(Math.toRadians(angle)));
             int dropY = currentPos.getY() + (int)(distance * Math.sin(Math.toRadians(angle)));
             return new WorldPosition(dropX, dropY, currentPos.getPlane());
@@ -240,8 +240,8 @@ public class DropTask implements Task {
         }
         
         // Calculate position 1-3 tiles beyond the edge
-        int dropDistance = Utils.random(DROP_DISTANCE_MIN, DROP_DISTANCE_MAX);
-        int parallelOffset = Utils.random(-1, 1); // Slight randomization along the edge
+        int dropDistance = RandomUtils.uniformRandom(DROP_DISTANCE_MIN, DROP_DISTANCE_MAX);
+        int parallelOffset = RandomUtils.uniformRandom(-1, 1); // Slight randomization along the edge
         
         int dropX = currentPos.getX();
         int dropY = currentPos.getY();

@@ -19,7 +19,6 @@ import com.osmb.api.ui.tabs.Settings;
 import com.osmb.api.ui.component.tabs.skill.SkillType;
 import com.osmb.api.utils.UIResult;
 import com.osmb.api.ui.component.tabs.skill.SkillsTabComponent.SkillLevel;
-import com.osmb.api.ui.component.tabs.skill.SkillsTabComponent;
 
 import com.osmb.api.ui.component.popout.PopoutPanelContainer;
 import com.osmb.api.ui.component.ComponentContainerStatus;
@@ -36,7 +35,7 @@ import com.osmb.api.visual.drawing.Canvas;
 import com.osmb.api.shape.Polygon;
 import com.osmb.api.shape.Rectangle;
 
-import com.osmb.api.utils.Utils;
+import com.osmb.api.utils.RandomUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -114,6 +113,7 @@ public class JorkHunter extends AbstractMetricsScript {
                 defaultOptions.put("maxCenterDistance", 0);
                 defaultOptions.put("recenterOnEmpty", false);
                 defaultOptions.put("requiresCustomAnchor", true);
+                defaultOptions.put("debugLogging", false);
                 onSettingsSelected(this.selectedTarget, null, this.selectedStrategy, false, -1, defaultOptions);
             });
         }
@@ -142,6 +142,11 @@ public class JorkHunter extends AbstractMetricsScript {
             Object chanceObj = options.get("expediteChance");
             if (chanceObj instanceof Integer) {
                 this.expediteCollectionChance = (Integer) chanceObj;
+            }
+            // Apply debug logging toggle if provided
+            Object dbgObj = options.get("debugLogging");
+            if (dbgObj instanceof Boolean) {
+                com.jork.utils.ScriptLogger.setDebugEnabled((Boolean) dbgObj);
             }
         }
         
@@ -179,13 +184,10 @@ public class JorkHunter extends AbstractMetricsScript {
             calculateMaxTraps();
         }
 
-        // Ensure tap-to-drop is enabled (this also ensures hotkey bar is visible)
-        ensureTapToDropEnabled();
-
-        // Load tasks
-        initializeTasks();
+        // Show hotkeys panel (naming reflects actual behavior)
+        showHotkeysPanel();
         
-        // Initialize metrics after tasks are loaded
+        // Initialize metrics
         initializeMetrics();
 
         ScriptLogger.info(this, "Initialisation complete. Starting tasks…");
@@ -198,6 +200,10 @@ public class JorkHunter extends AbstractMetricsScript {
      */
     private void setZoom() {
         log("Checking zoom level...");
+        if (getWidgetManager() == null) {
+            log("WidgetManager not ready; delaying zoom check");
+            return;
+        }
         Settings settings = getWidgetManager().getSettings();
 
         // Define our desired zoom range (27-34% for hunting)
@@ -205,23 +211,34 @@ public class JorkHunter extends AbstractMetricsScript {
         final int MAX_ZOOM = 34;
 
         // First check if zoom is already in acceptable range
-        UIResult<Integer> currentZoomResult = settings.getZoomLevel();
-        if (currentZoomResult.isFound()) {
-            int currentZoom = currentZoomResult.get();
-            log("Current zoom level: " + currentZoom + "%");
-            if (currentZoom >= MIN_ZOOM && currentZoom <= MAX_ZOOM) {
-                log("Zoom already in acceptable range: " + currentZoom + "%");
-                zoomSet = true;
-                return;
+        if (settings != null) {
+            UIResult<Integer> currentZoomResult = settings.getZoomLevel();
+            if (currentZoomResult.isFound()) {
+                int currentZoom = currentZoomResult.get();
+                log("Current zoom level: " + currentZoom + "%");
+                if (currentZoom >= MIN_ZOOM && currentZoom <= MAX_ZOOM) {
+                    log("Zoom already in acceptable range: " + currentZoom + "%");
+                    zoomSet = true;
+                    return;
+                }
             }
         }
         // Generate random zoom level between MIN_ZOOM and MAX_ZOOM
-        int targetZoom = Utils.random(MIN_ZOOM, MAX_ZOOM);
+        int targetZoom = RandomUtils.uniformRandom(MIN_ZOOM, MAX_ZOOM);
         log("Setting zoom to: " + targetZoom + "%");
 
-        // Attempt to set zoom
-        if (settings.setZoomLevel(targetZoom)) {
+        // Attempt to set zoom with a single backoff retry
+        if (settings != null && settings.setZoomLevel(targetZoom)) {
             log("Zoom set successfully to: " + targetZoom + "%");
+            zoomSet = true;
+            return;
+        }
+
+        // Backoff and retry once if settings is null or first attempt failed
+        try { Thread.sleep(RandomUtils.weightedRandom(250, 400)); } catch (InterruptedException ignored) {}
+        Settings retrySettings = getWidgetManager() != null ? getWidgetManager().getSettings() : null;
+        if (retrySettings != null && retrySettings.setZoomLevel(targetZoom)) {
+            log("Zoom set successfully (retry) to: " + targetZoom + "%");
             zoomSet = true;
         }
     }
@@ -241,11 +258,11 @@ public class JorkHunter extends AbstractMetricsScript {
     }
 
     /**
-     * Ensures tap-to-drop is enabled in the hotkey bar.
-     * This opens the hotkey panel by collapsing the PopoutPanelContainer, then enables tap-to-drop.
+     * Shows the hotkeys panel by collapsing the PopoutPanelContainer.
+     * Note: Naming reflects current API behavior; does not toggle tap-to-drop.
      */
-    private void ensureTapToDropEnabled() {
-        ScriptLogger.info(this, "Checking hotkey panel and tap-to-drop status...");
+    private void showHotkeysPanel() {
+        ScriptLogger.debug(this, "Checking hotkey panel visibility...");
         
         try {
             // Get the PopoutPanelContainer - when EXPANDED, it shows the button to open hotkeys
@@ -255,16 +272,16 @@ public class JorkHunter extends AbstractMetricsScript {
                 Rectangle bounds = popoutPanelContainer.getBounds();
                 if (bounds != null) {
                     ComponentContainerStatus containerStatus = popoutPanelContainer.getResult().getComponentImage().getGameFrameStatusType();
-                    ScriptLogger.info(this, "PopoutPanelContainer status: " + containerStatus);
+                    ScriptLogger.debug(this, "PopoutPanelContainer status: " + containerStatus);
                     
                     if (containerStatus == ComponentContainerStatus.EXPANDED) {
                         // When EXPANDED, we can see the button to toggle hotkeys
                         // Tap it to collapse the container and reveal the hotkeys
-                        ScriptLogger.info(this, "PopoutPanel is expanded - tapping to open hotkeys");
+                        ScriptLogger.info(this, "PopoutPanel expanded - tapping to reveal hotkeys");
                         
                         Rectangle bottomButton = new Rectangle(bounds.x + 5, bounds.y + bounds.height - 38, bounds.width - 10, 35);
                         if (getFinger().tap(bottomButton)) {
-                            ScriptLogger.info(this, "Tapped hotkey button, waiting for panel to collapse...");
+                            ScriptLogger.debug(this, "Tapped hotkey button, waiting for collapse...");
                             
                             // Wait until the popout panel has collapsed (which reveals the hotkeys)
                             submitTask(() -> {
@@ -273,17 +290,17 @@ public class JorkHunter extends AbstractMetricsScript {
                                     return false;
                                 }
                                 return popoutPanelContainer.getResult().getComponentImage().getGameFrameStatusType() == ComponentContainerStatus.COLLAPSED;
-                            }, Utils.random(1000, 2000));
+                            }, RandomUtils.uniformRandom(1000, 2000));
                             
-                            ScriptLogger.info(this, "Hotkey panel opened successfully");
+                            ScriptLogger.info(this, "Hotkey panel revealed");
                             
                             // Give a short delay for UI to update
-                            Thread.sleep(Utils.random(500, 800));
+                            Thread.sleep(RandomUtils.weightedRandom(500, 800));
                         } else {
                             ScriptLogger.warning(this, "Failed to tap the hotkey button");
                         }
                     } else if (containerStatus == ComponentContainerStatus.COLLAPSED) {
-                        ScriptLogger.info(this, "PopoutPanel is collapsed can't open hotkeys");
+                        ScriptLogger.debug(this, "PopoutPanel collapsed (hotkeys visible)");
                     }
                 } else {
                     ScriptLogger.warning(this, "PopoutPanelContainer bounds are null");
@@ -292,12 +309,12 @@ public class JorkHunter extends AbstractMetricsScript {
                 ScriptLogger.warning(this, "PopoutPanelContainer is null");
             }
         } catch (Exception e) {
-            ScriptLogger.exception(this, "checking/enabling tap-to-drop", e);
+            ScriptLogger.exception(this, "showing hotkeys panel", e);
         }
     }
 
     private void calculateMaxTraps() {
-        ScriptLogger.info(this, "Starting Hunter level calculation...");
+        ScriptLogger.debug(this, "Starting Hunter level calculation...");
         
         // Null checks first
         if (getWidgetManager() == null) {
@@ -312,13 +329,13 @@ public class JorkHunter extends AbstractMetricsScript {
             return;
         }
         
-        ScriptLogger.info(this, "SkillTab obtained, attempting to get Hunter level...");
+        ScriptLogger.debug(this, "SkillTab obtained, attempting to get Hunter level...");
         
         // Try with retries
         int maxRetries = 2;
         for (int attempt = 0; attempt < maxRetries; attempt++) {
             if (attempt > 0) {
-                ScriptLogger.info(this, "Retrying Hunter level read (attempt " + (attempt + 1) + "/" + maxRetries + ")");
+                ScriptLogger.debug(this, "Retrying Hunter level read (attempt " + (attempt + 1) + "/" + maxRetries + ")");
             }
             
             // Get skill level
@@ -329,7 +346,7 @@ public class JorkHunter extends AbstractMetricsScript {
             }
             
             int level = hunterInfo.getLevel();
-            ScriptLogger.info(this, "Raw Hunter level from API: " + level);
+            ScriptLogger.debug(this, "Raw Hunter level from API: " + level);
             
             // Calculate max traps using helper method
             maxTraps = calculateTrapsForLevel(level);
@@ -353,7 +370,7 @@ public class JorkHunter extends AbstractMetricsScript {
     public int getMaxTraps() {
         // If maxTraps is still 1 and we're above level 20, try to recalculate
         if (maxTraps == 1) {
-            SkillsTabComponent skillTab = (SkillsTabComponent) getWidgetManager().getSkillTab();
+            Skill skillTab = getWidgetManager().getSkillTab();
             if (skillTab != null) {
                 SkillLevel hunterInfo = skillTab.getSkillLevel(SkillType.HUNTER);
                 if (hunterInfo != null) {
@@ -442,7 +459,7 @@ public class JorkHunter extends AbstractMetricsScript {
                 
                 // Check if we should trigger expedited collection
                 if (expediteCollectionEnabled && !hasTriggeredExpedite && huntTask != null) {
-                    int roll = Utils.random(1, 100);
+                    int roll = RandomUtils.uniformRandom(1, 100);
                     if (roll <= expediteCollectionChance) {
                         ScriptLogger.info(this, "Expedite collection triggered! (Roll: " + roll + "/" + expediteCollectionChance + ")");
                         huntTask.expediteTrapsForBreak();
@@ -520,6 +537,8 @@ public class JorkHunter extends AbstractMetricsScript {
             } else {
                 ScriptLogger.warning(this, "Tile selection cancelled, using dynamic center");
                 requiresCustomAnchor = false; // Fall back to dynamic center
+                // Initialize tasks without a custom anchor
+                initializeTasks();
             }
         } catch (Exception e) {
             ScriptLogger.exception(this, "selecting custom anchor", e);
@@ -705,10 +724,6 @@ public class JorkHunter extends AbstractMetricsScript {
                 
                 // Draw the polygon outline with bright neon orange for better visibility
                 canvas.drawPolygon(tilePoly, 0xFF3300, 1.0); // Bright orange-red outline
-                
-                // Also draw a simple test rectangle to verify canvas is working
-                Rectangle bounds = tilePoly.getBounds();
-                canvas.fillRect(bounds.x, bounds.y, 10, 10, 0xFF0000); // Small red square as test
             }
         }
     }
