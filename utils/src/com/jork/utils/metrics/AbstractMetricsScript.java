@@ -176,4 +176,26 @@ public abstract class AbstractMetricsScript extends Script {
             metricsConfig.setPosition(position);
         }
     }
+    
+    /**
+     * Gets the time in milliseconds since the last XP gain
+     * @return Time elapsed since last XP gain in milliseconds, or 0 if not tracking XP
+     */
+    protected long getTimeSinceLastXPGain() {
+        if (metrics != null && metrics.getXPProvider() != null) {
+            return metrics.getXPProvider().getTimeSinceLastXPGain();
+        }
+        return 0; // Return 0 if not tracking XP
+    }
+    
+    /**
+     * Gets the formatted time since the last XP gain
+     * @return Formatted time string (HH:mm:ss.SSS), or "00:00:00" if not tracking XP
+     */
+    protected String getTimeSinceLastXPGainFormatted() {
+        if (metrics != null && metrics.getXPProvider() != null) {
+            return metrics.getXPProvider().getTimeSinceLastXPGainFormatted();
+        }
+        return "00:00:00";
+    }
 }

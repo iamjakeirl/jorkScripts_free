@@ -29,6 +29,6 @@ public final class HunterLocationConstants {
      * Used when "Chinchompas" is selected as the target.
      */
     public static final int[] CHINCHOMPA_REGIONS = {
-        8494, 8493, 10029, 10285, 9272, 9271, 5942, 9013, 5169, 4912, 12602, 12603, 10057
+        8494, 8493, 10029, 10285, 9272, 9271, 5942, 9013, 5169, 4912, 12602, 12603, 10057, 10129
     };
 } 

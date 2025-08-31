@@ -7,6 +7,7 @@ import com.osmb.api.ui.component.ComponentSearchResult;
 import com.osmb.api.ui.component.minimap.xpcounter.XPDropsComponent;
 import com.osmb.api.ui.component.tabs.skill.SkillType;
 import com.osmb.api.utils.RandomUtils;
+import com.osmb.api.utils.timing.Timer;
 import com.osmb.api.visual.color.ColorModel;
 import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
 import com.osmb.api.visual.image.SearchableImage;
@@ -25,6 +26,7 @@ public class XPMetricProvider {
     private XPTracker tracker;
     private Integer lastKnownXP;
     private int startingXP;
+    private Timer lastXPGainTimer;
     
     /**
      * Initializes the XP tracker for a specific skill using OCR
@@ -54,6 +56,9 @@ public class XPMetricProvider {
         
         // Ensure XP counter is visible
         ensureXPCounterVisible();
+        
+        // Initialize the XP gain timer
+        this.lastXPGainTimer = new Timer();
         
         // Read initial XP
         Integer initialXP = readCurrentXP();
@@ -188,6 +193,7 @@ public class XPMetricProvider {
             
             // Only update if we got a valid reading and XP increased
             if (currentXP > lastKnownXP) {
+                lastXPGainTimer.reset();  // Reset timer on XP gain (OSMB API method)
                 double gained = currentXP - lastKnownXP;
                 tracker.incrementXp(gained);
                 int totalGained = currentXP - startingXP;
@@ -327,5 +333,27 @@ public class XPMetricProvider {
      */
     public int getStartingXP() {
         return startingXP;
+    }
+    
+    /**
+     * Gets the time in milliseconds since the last XP gain
+     * @return Time elapsed since last XP gain in milliseconds
+     */
+    public long getTimeSinceLastXPGain() {
+        if (lastXPGainTimer != null) {
+            return lastXPGainTimer.timeElapsed();  // Use OSMB Timer API
+        }
+        return 0;
+    }
+    
+    /**
+     * Gets the formatted time since the last XP gain
+     * @return Formatted time string (HH:mm:ss.SSS)
+     */
+    public String getTimeSinceLastXPGainFormatted() {
+        if (lastXPGainTimer != null) {
+            return lastXPGainTimer.getTimeElapsedFormatted();
+        }
+        return "00:00:00";
     }
 }

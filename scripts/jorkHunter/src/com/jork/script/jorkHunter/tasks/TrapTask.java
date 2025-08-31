@@ -547,9 +547,9 @@ public class TrapTask extends AbstractHuntingTask {
                         // This prevents RED traps from being removed prematurely during drain mode
                     }
                 } else {
-                    ScriptLogger.warning(script, "Blind tap verification also failed - keeping trap in tracking for retry");
-                    // DO NOT remove trap - multiple failures might be due to timing/positioning
-                    // Keeping it tracked ensures canBreak() returns false until physically collected
+                    // Final fallback failed: remove from tracking to avoid infinite retries
+                    ScriptLogger.warning(script, "Blind tap verification failed - removing trap from tracking to avoid retry loop");
+                    trapManager.removeTrap(trapPos);
                 }
             }
             

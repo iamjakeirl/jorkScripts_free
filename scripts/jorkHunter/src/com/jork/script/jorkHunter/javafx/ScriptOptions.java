@@ -46,6 +46,8 @@ public class ScriptOptions extends VBox {
     private final CheckBox expediteCollectionCheck;
     private final TextField expediteChanceInput;
     private final CheckBox debugLoggingCheck;
+    private final CheckBox xpFailsafeCheck;
+    private final TextField xpFailsafeTimeoutInput;
     
     // Dynamic strategy options
     private VBox strategyOptionsContainer;
@@ -149,7 +151,7 @@ public class ScriptOptions extends VBox {
         strategyLbl.setMinWidth(100);
         
         strategyDropdown = new ComboBox<>();
-        strategyDropdown.getItems().addAll("Auto", "X-Pattern", "L-Pattern", "Line", "Cross");
+        strategyDropdown.getItems().addAll("Auto", "X-Pattern", "L-Pattern", "Line", "Cross", "Custom");
         strategyDropdown.getSelectionModel().selectFirst();
         strategyDropdown.setPrefWidth(250);
         strategyDropdown.setStyle(getComboBoxStyle());
@@ -235,8 +237,43 @@ public class ScriptOptions extends VBox {
         debugLoggingCheck = new CheckBox("Enable debug logging");
         debugLoggingCheck.setStyle(getCheckBoxStyle());
         debugLoggingCheck.setSelected(false);
+        
+        // XP Failsafe Settings
+        Label failsafeSectionLabel = new Label("FAILSAFE SETTINGS");
+        failsafeSectionLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_SECONDARY + ";");
+        
+        xpFailsafeCheck = new CheckBox("Stop script if no XP gained for:");
+        xpFailsafeCheck.setStyle(getCheckBoxStyle());
+        xpFailsafeCheck.setSelected(true); // Default enabled for safety
+        
+        xpFailsafeTimeoutInput = new TextField("5");
+        xpFailsafeTimeoutInput.setPromptText("1-60");
+        xpFailsafeTimeoutInput.setPrefWidth(60);
+        xpFailsafeTimeoutInput.setStyle(getTextFieldStyle());
+        
+        Label minutesLabel = new Label("minutes");
+        minutesLabel.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 12px;");
+        
+        // Enable/disable timeout input based on checkbox
+        xpFailsafeCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            xpFailsafeTimeoutInput.setDisable(!newVal);
+            if (!newVal) {
+                xpFailsafeTimeoutInput.setText("5");
+            }
+        });
+        
+        HBox failsafeBox = new HBox(8, xpFailsafeCheck, xpFailsafeTimeoutInput, minutesLabel);
+        failsafeBox.setAlignment(Pos.CENTER_LEFT);
+        
+        Label failsafeInfo = new Label("Automatically stops the script if no Hunter XP is gained within the specified time");
+        failsafeInfo.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 11px;");
+        failsafeInfo.setWrapText(true);
+        failsafeInfo.setPadding(new Insets(0, 0, 0, 25));
+        
+        VBox failsafeSection = new VBox(8, failsafeSectionLabel, failsafeBox, failsafeInfo);
+        failsafeSection.setPadding(new Insets(15, 0, 0, 0));
 
-        VBox advancedSection = new VBox(12, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck);
+        VBox advancedSection = new VBox(12, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck, failsafeSection);
         advancedSection.setPadding(new Insets(0, 0, 20, 0));
 
         // ── Action Button Section ─────────────────────────────────
@@ -261,6 +298,16 @@ public class ScriptOptions extends VBox {
             strategyOptions.put("expediteChance", getExpediteCollectionChance());
             // Add debug logging setting
             strategyOptions.put("debugLogging", isDebugLoggingEnabled());
+            
+            // Add XP failsafe settings to strategy options
+            strategyOptions.put("xpFailsafeEnabled", xpFailsafeCheck.isSelected());
+            try {
+                int timeout = Integer.parseInt(xpFailsafeTimeoutInput.getText());
+                timeout = Math.max(1, Math.min(60, timeout)); // Clamp between 1-60 minutes
+                strategyOptions.put("xpFailsafeTimeout", timeout);
+            } catch (NumberFormatException ex) {
+                strategyOptions.put("xpFailsafeTimeout", 5); // Default to 5 minutes
+            }
             
             // Notify the script that settings have been confirmed (FX thread)
             script.onSettingsSelected(
@@ -431,6 +478,18 @@ public class ScriptOptions extends VBox {
                                       "• 3 traps: L-Pattern\n" + 
                                       "• 4 traps: Cross\n" +
                                       "• 5 traps: X-Pattern");
+            descLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
+            descLabel.setWrapText(true);
+            
+            strategyOptionsContainer.getChildren().addAll(infoLabel, descLabel);
+        } else if ("Custom".equals(strategyName)) {
+            // Show info about Custom mode
+            Label infoLabel = new Label("Custom Tile Selection");
+            infoLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 12px;");
+            
+            Label descLabel = new Label("Select multiple trap positions in-game.\n" +
+                                      "You'll be able to choose exact tiles\n" +
+                                      "where traps should be placed.");
             descLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: " + TEXT_SECONDARY + ";");
             descLabel.setWrapText(true);
             
