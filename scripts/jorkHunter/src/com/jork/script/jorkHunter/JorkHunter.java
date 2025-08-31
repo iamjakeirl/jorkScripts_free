@@ -67,7 +67,7 @@ public class JorkHunter extends AbstractMetricsScript {
 
     // --- Trap Management (Centralized) ---------------------------------------
     // This flag is used to signal that the script should stop laying new traps
-    // and just clear existing ones before a break or world hop.
+    // and just clear existing ones before a break.
     private boolean isDrainingForBreak = false;
     private boolean zoomSet = false;
     
@@ -526,10 +526,10 @@ public class JorkHunter extends AbstractMetricsScript {
         
         // --- Pre-Task-Execution Checks (runs every poll) ---------------------
         
-        // Proactively check if a break or hop is due, and if so, start draining traps.
-        if (getProfileManager().isDueToBreak() || getProfileManager().isDueToHop() || getProfileManager().isDueToAFK()) {
+        // Proactively check if a break is due, and if so, start draining traps.
+        if (getProfileManager().isDueToBreak()) {
             if (!this.isDrainingForBreak) {
-                ScriptLogger.info(this, "Break or hop is due. Entering drain mode to clear active traps.");
+                ScriptLogger.info(this, "Break is due. Entering drain mode to clear active traps.");
                 this.isDrainingForBreak = true;
                 
                 // Check if we should trigger expedited collection
@@ -545,28 +545,7 @@ public class JorkHunter extends AbstractMetricsScript {
                 }
             }
         }
-        
-        // If an AFK is scheduled and traps are already clear, trigger it immediately.
-        TrapStateManager trapManager = getTrapStateManager();
-        if (getProfileManager().isDueToAFK() && trapManager != null && trapManager.isEmpty() && !trapManager.isCurrentlyLayingTrap()) {
-            ScriptLogger.info(this, "AFK is due and no traps are active. Triggering AFK now.");
-            getProfileManager().forceAFK();
-            return 1500; // Let the AFK manager take over
-        }
 
-        // If we entered drain mode for a world hop and the hop condition has cleared,
-        // reset drain/expedite flags once all traps are fully cleared (no grace periods).
-        if (isDrainingForBreak && !getProfileManager().isDueToBreak() && !getProfileManager().isDueToHop()) {
-            if (trapManager != null) {
-                boolean hasTraps = !trapManager.isEmpty();
-                boolean hasPendingTransitions = trapManager.hasPendingGracePeriods();
-                if (!hasTraps && !hasPendingTransitions) {
-                    ScriptLogger.info(this, "All traps cleared and no pending transitions - resuming after world hop");
-                    isDrainingForBreak = false;
-                    hasTriggeredExpedite = false;
-                }
-            }
-        }
 
         // --- Settings Confirmation Check -------------------------------------
         // Do nothing until the user has confirmed the settings in the UI.
@@ -676,9 +655,9 @@ public class JorkHunter extends AbstractMetricsScript {
         initializeTasks();
     }
 
-    // ───────────────────────────────────────────────────────────────────────
-    // │ BREAK & WORLD HOP MANAGEMENT                                          │
-    // ───────────────────────────────────────────────────────────────────────
+        // ───────────────────────────────────────────────────────────────────────
+        // │ BREAK MANAGEMENT                                                     │
+        // ───────────────────────────────────────────────────────────────────────
 
     @Override
     public boolean canBreak() {
