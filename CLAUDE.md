@@ -105,3 +105,4 @@ Central logging (`com.jork.utils.ScriptLogger`) – info, warn, error, debug + a
 - OSMB API is *visual*; expect nulls & delays.
 - Project follows patterns required by OSMB client to avoid detection.
 - Utility classes ensure consistency & reuse.
+- ./gradlew clean buildAllVariants --refresh-dependencies --rerun-tasks --no-build-cache to build all jar variants of jorkHunter

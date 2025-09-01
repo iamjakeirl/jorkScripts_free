@@ -113,6 +113,15 @@ public abstract class AbstractHuntingTask implements Task {
      * Find a safe random position within hunting zones.
      */
     protected WorldPosition findSafeRandomPosition(Set<WorldPosition> existingTraps) {
+        // Add safety check for empty hunting zones
+        if (huntingZones == null || huntingZones.isEmpty()) {
+            ScriptLogger.error(script, "CRITICAL: No hunting zones available for trap placement!");
+            ScriptLogger.error(script, "This usually means the custom anchor selection was cancelled or failed.");
+            ScriptLogger.error(script, "Please restart the script and select a valid hunting location.");
+            script.stop();  // Stop the script
+            return null;
+        }
+        
         for (int attempt = 0; attempt < 10; attempt++) {
             RectangleArea randomZone = huntingZones.get(RandomUtils.uniformRandom(0, huntingZones.size() - 1));
             WorldPosition candidate = randomZone.getRandomPosition();

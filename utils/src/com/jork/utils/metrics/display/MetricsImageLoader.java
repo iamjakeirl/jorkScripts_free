@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.ScriptLogger;
 
 /**
@@ -78,6 +79,7 @@ public class MetricsImageLoader {
             return resized;
             
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.warning(null, "Failed to load/resize image: " + path + " - " + e.getMessage());
             return null;
         }

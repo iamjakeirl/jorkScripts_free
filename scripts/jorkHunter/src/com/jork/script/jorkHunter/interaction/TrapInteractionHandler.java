@@ -35,8 +35,8 @@ public class TrapInteractionHandler implements InteractionHandler {
     private static final double POLYGON_OPACITY = 0.8;
     
     // Chinchompa polygon transformation parameters
-    private static final double CHINCHOMPA_X_SCALE = 0.3;  // 30% width
-    private static final double CHINCHOMPA_Y_SCALE = 0.6;  // 60% height
+    private static final double CHINCHOMPA_X_SCALE = 0.25;  // 25% width
+    private static final double CHINCHOMPA_Y_SCALE = 0.55;  // 55% height
     private static final PolygonAlignment CHINCHOMPA_ALIGNMENT = PolygonAlignment.CENTER_LEFT_EDGE; // Left edge at center
     
     /**

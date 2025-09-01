@@ -2,6 +2,7 @@ package com.jork.utils.metrics.display;
 
 import com.osmb.api.visual.drawing.Canvas;
 import com.jork.utils.metrics.core.MetricType;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.ScriptLogger;
 
 import java.awt.*;
@@ -360,6 +361,7 @@ public class MetricsDisplay {
                     config.getBackgroundScaleMode()
                 );
             } catch (Exception e) {
+                ExceptionUtils.rethrowIfTaskInterrupted(e);
                 ScriptLogger.warning(null, "Failed to load background image: " + e.getMessage());
                 backgroundImage = null;
             }
@@ -379,6 +381,7 @@ public class MetricsDisplay {
                     System.out.println("[MetricsDisplay] Logo loaded successfully: " + logoImage.getWidth() + "x" + logoImage.getHeight());
                 }
             } catch (Exception e) {
+                ExceptionUtils.rethrowIfTaskInterrupted(e);
                 System.out.println("[MetricsDisplay] Failed to load logo: " + e.getMessage());
                 e.printStackTrace();
                 ScriptLogger.warning(null, "Failed to load logo image: " + e.getMessage());

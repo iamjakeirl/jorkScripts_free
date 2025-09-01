@@ -11,6 +11,7 @@ import com.osmb.api.utils.timing.Timer;
 import com.osmb.api.visual.color.ColorModel;
 import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
 import com.osmb.api.visual.image.SearchableImage;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.ScriptLogger;
 
 /**
@@ -51,6 +52,7 @@ public class XPMetricProvider {
             this.skillSprite = fullSprite.subImage(fullSprite.width / 2, 0, 
                 fullSprite.width / 2, fullSprite.height);
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.warning(script, "Failed to load sprite " + spriteId + ": " + e.getMessage());
         }
         

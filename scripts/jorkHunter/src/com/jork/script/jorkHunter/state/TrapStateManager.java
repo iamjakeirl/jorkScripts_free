@@ -5,6 +5,7 @@ import com.jork.script.jorkHunter.trap.TrapType;
 import com.jork.script.jorkHunter.trap.TrapStateHandlingMode;
 import com.jork.script.jorkHunter.interaction.TrapVisibilityChecker;
 import com.jork.script.jorkHunter.interaction.InteractionResult;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.ScriptLogger;
 import com.osmb.api.location.position.types.WorldPosition;
 import com.osmb.api.visual.PixelAnalyzer;
@@ -33,6 +34,7 @@ public class TrapStateManager {
     private final TrapType trapType;
     private final TrapVisibilityChecker visibilityChecker;
     private final ConcurrentHashMap<WorldPosition, TrapInfo> traps = new ConcurrentHashMap<>();
+    private final boolean distanceBasedPrioritization;
     private final AtomicBoolean isLayingTrap = new AtomicBoolean(false);
     private volatile WorldPosition currentlyLayingPosition = null; // Track which position is being laid
     private final AtomicBoolean isResettingTrap = new AtomicBoolean(false);
@@ -46,6 +48,9 @@ public class TrapStateManager {
     // Per-trap random grace periods to handle animation delays (6-20 seconds)
     private Map<WorldPosition, Long> trapGracePeriods = new HashMap<>();
     
+    // Per-trap randomized critical thresholds for successful traps (25-35 seconds)
+    private Map<WorldPosition, Long> trapCriticalThresholds = new HashMap<>();
+    
     // UI-occluded trap tracking for repositioning
     private Set<WorldPosition> trapsNeedingRepositioning = new HashSet<>();
     
@@ -53,6 +58,7 @@ public class TrapStateManager {
         this.script = script;
         this.trapType = trapType;
         this.visibilityChecker = new TrapVisibilityChecker(script);
+        this.distanceBasedPrioritization = script.isDistanceBasedPrioritization();
     }
     
     /**
@@ -146,6 +152,7 @@ public class TrapStateManager {
                              ", Finished: " + getFinishedCount() + ", Total: " + getTotalCount());
             
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.error(script, "Error during trap state scan: " + e.getMessage());
         }
     }
@@ -179,6 +186,7 @@ public class TrapStateManager {
                 }
             };
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.warning(script, "Error mapping respawn circle type: " + e.getMessage());
             return TrapState.UNKNOWN;
         }
@@ -287,6 +295,11 @@ public class TrapStateManager {
             // Track metrics for successful vs failed catches
             if (isGreen(current)) {
                 script.onTrapSuccess();
+                // Generate a random critical threshold for this successful trap (25-35 seconds, weighted towards 35)
+                long criticalThreshold = RandomUtils.weightedRandom(25000, 35000); // 25-35 seconds in milliseconds
+                trapCriticalThresholds.put(pos, criticalThreshold);
+                ScriptLogger.debug(script, "Trap at " + pos + " will become critical after " + 
+                                 (criticalThreshold / 1000) + " seconds");
             } else if (isRed(current)) {
                 script.onTrapFailed();
             }
@@ -436,10 +449,14 @@ public class TrapStateManager {
                      (trapInfo.state() == TrapState.FINISHED && trapType.getStateHandlingMode() == TrapStateHandlingMode.BINARY)) {
                 long successDuration = currentTime - trapInfo.lastUpdated();
                 
-                // If successful for more than 40 seconds, mark as critical (risk of collapsing)
-                if (successDuration > 40000 && !trapInfo.flags().hasFlag(TrapFlag.CRITICAL_SUCCESS)) {
+                // Get the randomized critical threshold for this trap (default to 30s if not found)
+                long criticalThreshold = trapCriticalThresholds.getOrDefault(pos, 30000L);
+                
+                // If successful for more than the randomized threshold, mark as critical (risk of collapsing)
+                if (successDuration > criticalThreshold && !trapInfo.flags().hasFlag(TrapFlag.CRITICAL_SUCCESS)) {
                     ScriptLogger.warning(script, "Successful trap at " + pos + " has been waiting for " + 
-                        (successDuration / 1000) + " seconds - marking as CRITICAL (collapse risk)");
+                        (successDuration / 1000) + " seconds (threshold: " + (criticalThreshold / 1000) + 
+                        "s) - marking as CRITICAL (collapse risk)");
                     setFlag(pos, TrapFlag.CRITICAL_SUCCESS);
                 }
                 
@@ -584,6 +601,7 @@ public class TrapStateManager {
             // Clean up all associated tracking data
             missingTrapsTimestamp.remove(position);
             trapGracePeriods.remove(position);
+            trapCriticalThresholds.remove(position);
             trapsNeedingRepositioning.remove(position);
             ScriptLogger.info(script, "Removed trap at " + position + " from tracking");
             return true;
@@ -710,6 +728,7 @@ public class TrapStateManager {
         previousRespawnStates.clear();
         missingTrapsTimestamp.clear();
         trapGracePeriods.clear();
+        trapCriticalThresholds.clear();
         trapsNeedingRepositioning.clear();
         ScriptLogger.info(script, "Cleared all trap tracking data");
     }
@@ -1039,17 +1058,20 @@ public class TrapStateManager {
             TrapInfo trapA = a.fullInfo();
             TrapInfo trapB = b.fullInfo();
             
-            // First priority: GREEN (FINISHED_SUCCESS) over RED (FINISHED_FAILED)
-            boolean aIsGreen = trapA.state() == TrapState.FINISHED_SUCCESS;
-            boolean bIsGreen = trapB.state() == TrapState.FINISHED_SUCCESS;
-            
-            if (aIsGreen && !bIsGreen) {
-                return -1; // A (green) comes first
-            } else if (!aIsGreen && bIsGreen) {
-                return 1;  // B (green) comes first
+            // First priority (optional): GREEN (FINISHED_SUCCESS) over RED (FINISHED_FAILED)
+            // Only apply this prioritization if distanceBasedPrioritization is FALSE
+            if (!distanceBasedPrioritization) {
+                boolean aIsGreen = trapA.state() == TrapState.FINISHED_SUCCESS;
+                boolean bIsGreen = trapB.state() == TrapState.FINISHED_SUCCESS;
+                
+                if (aIsGreen && !bIsGreen) {
+                    return -1; // A (green) comes first
+                } else if (!aIsGreen && bIsGreen) {
+                    return 1;  // B (green) comes first
+                }
             }
             
-            // Second priority: Distance from player (with epsilon for "equidistant")
+            // Next priority: Distance from player (with epsilon for "equidistant")
             double distanceA = playerPos.distanceTo(trapA.position());
             double distanceB = playerPos.distanceTo(trapB.position());
             double distanceDiff = Math.abs(distanceA - distanceB);
@@ -1075,9 +1097,10 @@ public class TrapStateManager {
         if (finishedTraps.size() > 1) {
             double selectedDistance = playerPos.distanceTo(selected.fullInfo().position());
             String selectedType = selected.fullInfo().state() == TrapState.FINISHED_SUCCESS ? "GREEN" : "RED";
+            String priorityMode = distanceBasedPrioritization ? "distance-based" : "green-first";
             ScriptLogger.debug(script, "Selected " + selectedType + " trap at " + selected.position() + 
                              " (distance: " + String.format("%.1f", selectedDistance) + ") from " + 
-                             finishedTraps.size() + " finished traps");
+                             finishedTraps.size() + " finished traps using " + priorityMode + " prioritization");
         }
         
         return Optional.of(selected);

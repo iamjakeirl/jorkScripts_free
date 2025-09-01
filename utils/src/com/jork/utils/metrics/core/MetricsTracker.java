@@ -2,6 +2,7 @@ package com.jork.utils.metrics.core;
 
 import com.osmb.api.script.Script;
 import com.osmb.api.visual.drawing.Canvas;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.metrics.display.MetricsDisplay;
 import com.jork.utils.metrics.display.MetricsPanelConfig;
 import com.jork.utils.metrics.providers.RuntimeMetricProvider;
@@ -125,6 +126,7 @@ public class MetricsTracker {
                     MetricType.NUMBER);
                     
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             script.log("Failed to initialize XP tracking: " + e.getMessage());
         }
     }

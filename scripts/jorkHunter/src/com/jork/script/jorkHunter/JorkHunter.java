@@ -20,11 +20,13 @@ import com.osmb.api.ui.tabs.Settings;
 import com.osmb.api.ui.component.tabs.skill.SkillType;
 import com.osmb.api.utils.UIResult;
 import com.osmb.api.ui.component.tabs.skill.SkillsTabComponent.SkillLevel;
+import com.osmb.api.ui.GameState;
 
 import com.osmb.api.ui.component.popout.PopoutPanelContainer;
 import com.osmb.api.ui.component.ComponentContainerStatus;
 import com.jork.script.jorkHunter.javafx.ScriptOptions;
 import com.jork.utils.tilepicker.EnhancedTilePickerPanel;
+import com.jork.utils.ExceptionUtils;
 import com.jork.utils.ScriptLogger;
 import com.jork.utils.metrics.AbstractMetricsScript;
 import com.jork.utils.metrics.core.MetricType;
@@ -80,6 +82,9 @@ public class JorkHunter extends AbstractMetricsScript {
     private volatile boolean xpFailsafeEnabled = false;  // Whether XP failsafe is enabled
     private volatile int xpFailsafeTimeoutMinutes = 10;  // Minutes without XP before stopping
     private long lastFailsafeWarningTime = 0;  // Track when we last warned about failsafe
+    
+    // --- Trap Prioritization Settings ----------------------------------------
+    private volatile boolean distanceBasedPrioritization = false;  // Whether to use distance-based prioritization
     
     // --- Custom Anchor State Management --------------------------------------
     private volatile boolean requiresCustomAnchor = false;
@@ -162,10 +167,19 @@ public class JorkHunter extends AbstractMetricsScript {
             if (dbgObj instanceof Boolean) {
                 com.jork.utils.ScriptLogger.setDebugEnabled((Boolean) dbgObj);
             }
+            // Extract distance-based prioritization setting
+            Object distPriorObj = options.get("distanceBasedPrioritization");
+            if (distPriorObj instanceof Boolean) {
+                this.distanceBasedPrioritization = (Boolean) distPriorObj;
+            }
         }
         
         if (expediteCollectionEnabled) {
             ScriptLogger.info(this, "Expedite collection enabled with " + expediteCollectionChance + "% chance");
+        }
+        
+        if (distanceBasedPrioritization) {
+            ScriptLogger.info(this, "Distance-based trap prioritization ENABLED");
         }
         
         // Extract XP failsafe settings if present
@@ -243,8 +257,8 @@ public class JorkHunter extends AbstractMetricsScript {
         Settings settings = getWidgetManager().getSettings();
 
         // Define our desired zoom range (27-34% for hunting)
-        final int MIN_ZOOM = 27;
-        final int MAX_ZOOM = 34;
+        final int MIN_ZOOM = 24;
+        final int MAX_ZOOM = 31;
 
         // First check if zoom is already in acceptable range
         if (settings != null) {
@@ -345,6 +359,7 @@ public class JorkHunter extends AbstractMetricsScript {
                 ScriptLogger.warning(this, "PopoutPanelContainer is null");
             }
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.exception(this, "showing hotkeys panel", e);
         }
     }
@@ -455,9 +470,24 @@ public class JorkHunter extends AbstractMetricsScript {
             huntingZones = Collections.singletonList(customZone);
             ScriptLogger.info(this, "Using custom 5x5 hunting zone centered at " + customAnchorPosition);
         } else {
-            // This shouldn't happen as we always use TilePicker now
-            ScriptLogger.warning(this, "No custom anchor position set, using empty hunting zones");
-            huntingZones = Collections.emptyList();
+            // Fallback: create default zone around player position
+            WorldPosition playerPos = getWorldPosition();
+            if (playerPos != null) {
+                ScriptLogger.warning(this, "Custom anchor not selected properly - creating default 5x5 zone around current position");
+                int areaSize = 5;
+                RectangleArea fallbackZone = new RectangleArea(
+                    playerPos.getX() - areaSize / 2,
+                    playerPos.getY() - areaSize / 2,
+                    areaSize,
+                    areaSize,
+                    playerPos.getPlane()
+                );
+                huntingZones = Collections.singletonList(fallbackZone);
+                ScriptLogger.info(this, "Using fallback 5x5 hunting zone centered at player position: " + playerPos);
+            } else {
+                ScriptLogger.error(this, "No custom anchor and player position unavailable - using empty hunting zones");
+                huntingZones = Collections.emptyList();
+            }
         }
         
         // Create and store reference to HuntTask
@@ -633,6 +663,7 @@ public class JorkHunter extends AbstractMetricsScript {
                 }
             }
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             ScriptLogger.exception(this, "selecting custom anchor", e);
             requiresCustomAnchor = false; // Fall back
         } finally {
@@ -699,6 +730,10 @@ public class JorkHunter extends AbstractMetricsScript {
     public boolean isDrainingForBreak() {
         return isDrainingForBreak;
     }
+    
+    public boolean isDistanceBasedPrioritization() {
+        return distanceBasedPrioritization;
+    }
 
     @Override
     protected void onMetricsPaint(Canvas canvas) {
@@ -725,6 +760,7 @@ public class JorkHunter extends AbstractMetricsScript {
             // drawRespawnCirclesWithZOffset(canvas);  // Commented out - debugging tool
 
         } catch (Exception e) {
+            ExceptionUtils.rethrowIfTaskInterrupted(e);
             // Silently catch any painting errors to avoid disrupting the script
             ScriptLogger.debug(this, "Error in onPaint: " + e.getMessage());
         }
@@ -1001,6 +1037,78 @@ public class JorkHunter extends AbstractMetricsScript {
     public void onTrapFailed() {
         failedCatches.incrementAndGet();
         totalChecks.incrementAndGet();
+    }
+    
+    /**
+     * Called when the game state changes (login/logout/world hop).
+     * Clears trap tracking when we're no longer in game since traps are lost on logout.
+     */
+    @Override
+    public void onGameStateChanged(GameState newGameState) {
+        // IMPORTANT: Call parent implementation to ensure proper framework registration
+        super.onGameStateChanged(newGameState);
+        
+        // Check if we've transitioned away from being logged in
+        // This happens during world hops, disconnects, or manual logouts
+        if (newGameState != null && newGameState != GameState.LOGGED_IN) {
+            // We've logged out or are on login screen - all traps are lost
+            if (huntTask != null) {
+                TrapStateManager trapManager = huntTask.getTrapStateManager();
+                if (trapManager != null && !trapManager.isEmpty()) {
+                    ScriptLogger.warning(this, "Detected logout/world hop (GameState: " + newGameState + 
+                                       ") - clearing " + trapManager.getTotalCount() + " tracked traps");
+                    trapManager.clearAllTraps();
+                    
+                    // Reset any laying/resetting flags to prevent stuck states
+                    trapManager.clearLayingFlag();
+                    trapManager.clearResetFlag();
+                }
+            }
+            
+            // Reset drain mode flags if we were preparing for break
+            if (isDrainingForBreak) {
+                isDrainingForBreak = false;
+                hasTriggeredExpedite = false;
+                ScriptLogger.info(this, "Reset drain mode flags due to logout");
+            }
+        } else if (newGameState == GameState.LOGGED_IN) {
+            // We've logged back in
+            ScriptLogger.info(this, "Logged back in - trap tracking cleared, will rescan for traps");
+        }
+    }
+    
+    /**
+     * Called when the script relogs after a disconnect or world hop.
+     * This ensures trap tracking is cleared since all traps are lost on logout.
+     */
+    @Override
+    public void onRelog() {
+        ScriptLogger.info(this, "=== RELOG DETECTED - Clearing trap tracking ===");
+        
+        // Clear all trap tracking since traps are lost on logout/world hop
+        if (huntTask != null) {
+            TrapStateManager trapManager = huntTask.getTrapStateManager();
+            if (trapManager != null) {
+                int trapCount = trapManager.getTotalCount();
+                if (trapCount > 0) {
+                    ScriptLogger.warning(this, "Clearing " + trapCount + " tracked traps after relog");
+                }
+                trapManager.clearAllTraps();
+                
+                // Also clear laying/resetting flags
+                trapManager.clearLayingFlag();
+                trapManager.clearResetFlag();
+            }
+        }
+        
+        // Reset drain mode if it was active
+        if (isDrainingForBreak) {
+            isDrainingForBreak = false;
+            hasTriggeredExpedite = false;
+            ScriptLogger.info(this, "Reset drain mode flags after relog");
+        }
+        
+        ScriptLogger.info(this, "Trap tracking cleared - will rescan for new traps");
     }
     
     /**
