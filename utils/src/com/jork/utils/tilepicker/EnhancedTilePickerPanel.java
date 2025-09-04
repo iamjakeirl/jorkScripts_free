@@ -16,6 +16,8 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -256,6 +258,16 @@ public class EnhancedTilePickerPanel {
         
         Scene scene = new Scene(mainContainer);
         scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
+        
+        // Add keyboard shortcut for Enter key to confirm selection
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                selectionConfirmed = true;
+                Stage stage = (Stage) scene.getWindow();
+                stage.close();
+            }
+        });
+        
         return scene;
     }
     

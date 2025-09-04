@@ -84,7 +84,7 @@ public class JorkHunter extends AbstractMetricsScript {
     private long lastFailsafeWarningTime = 0;  // Track when we last warned about failsafe
     
     // --- Trap Prioritization Settings ----------------------------------------
-    private volatile boolean distanceBasedPrioritization = false;  // Whether to use distance-based prioritization
+    private volatile boolean distanceBasedPrioritization = true;  // Permanently enabled for efficiency
     
     // --- Custom Anchor State Management --------------------------------------
     private volatile boolean requiresCustomAnchor = false;
@@ -167,20 +167,21 @@ public class JorkHunter extends AbstractMetricsScript {
             if (dbgObj instanceof Boolean) {
                 com.jork.utils.ScriptLogger.setDebugEnabled((Boolean) dbgObj);
             }
-            // Extract distance-based prioritization setting
-            Object distPriorObj = options.get("distanceBasedPrioritization");
-            if (distPriorObj instanceof Boolean) {
-                this.distanceBasedPrioritization = (Boolean) distPriorObj;
-            }
+            // Distance-based prioritization is now permanently enabled
+            // Keeping parsing code commented for potential future use:
+            // Object distPriorObj = options.get("distanceBasedPrioritization");
+            // if (distPriorObj instanceof Boolean) {
+            //     this.distanceBasedPrioritization = (Boolean) distPriorObj;
+            // }
+            this.distanceBasedPrioritization = true; // Always enabled
         }
         
         if (expediteCollectionEnabled) {
             ScriptLogger.info(this, "Expedite collection enabled with " + expediteCollectionChance + "% chance");
         }
         
-        if (distanceBasedPrioritization) {
-            ScriptLogger.info(this, "Distance-based trap prioritization ENABLED");
-        }
+        // Always log that distance-based prioritization is enabled
+        ScriptLogger.info(this, "Distance-based trap prioritization ENABLED");
         
         // Extract XP failsafe settings if present
         if (options != null) {

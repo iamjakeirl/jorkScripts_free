@@ -46,7 +46,7 @@ public class ScriptOptions extends VBox {
     private final CheckBox expediteCollectionCheck;
     private final TextField expediteChanceInput;
     private final CheckBox debugLoggingCheck;
-    private final CheckBox distanceBasedPrioritizationCheck;
+    // Removed distance-based prioritization checkbox - now permanently enabled
     private final CheckBox xpFailsafeCheck;
     private final TextField xpFailsafeTimeoutInput;
     
@@ -204,7 +204,7 @@ public class ScriptOptions extends VBox {
         // Expedite Collection Settings
         expediteCollectionCheck = new CheckBox("Expedite trap collection before breaks");
         expediteCollectionCheck.setStyle(getCheckBoxStyle());
-        expediteCollectionCheck.setSelected(false);
+        expediteCollectionCheck.setSelected(true);  // Default enabled for efficiency
         
         Label chanceLabel = new Label("Chance:");
         chanceLabel.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 10px;");
@@ -213,7 +213,7 @@ public class ScriptOptions extends VBox {
         expediteChanceInput.setPromptText("0-100");
         expediteChanceInput.setPrefWidth(45);
         expediteChanceInput.setStyle(getTextFieldStyle());
-        expediteChanceInput.setDisable(true);
+        expediteChanceInput.setDisable(false);  // Enabled by default since checkbox is checked
         
         Label percentLabel = new Label("%");
         percentLabel.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 10px;");
@@ -239,12 +239,8 @@ public class ScriptOptions extends VBox {
         debugLoggingCheck.setStyle(getCheckBoxStyle());
         debugLoggingCheck.setSelected(false);
         
-        // Distance-based prioritization toggle
-        distanceBasedPrioritizationCheck = new CheckBox("Use distance-based trap prioritization");
-        distanceBasedPrioritizationCheck.setStyle(getCheckBoxStyle());
-        distanceBasedPrioritizationCheck.setSelected(false);
-        distanceBasedPrioritizationCheck.setTooltip(new javafx.scene.control.Tooltip(
-            "When enabled, prioritizes traps by distance instead of always preferring green (successful) traps"));
+        // Distance-based prioritization is now permanently enabled
+        // (removed checkbox - always uses nearest trap for efficiency)
         
         // XP Failsafe Settings
         Label failsafeSectionLabel = new Label("FAILSAFE SETTINGS");
@@ -281,7 +277,7 @@ public class ScriptOptions extends VBox {
         VBox failsafeSection = new VBox(5, failsafeSectionLabel, failsafeBox, failsafeInfo);
         failsafeSection.setPadding(new Insets(8, 0, 0, 0));
 
-        VBox advancedSection = new VBox(8, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck, distanceBasedPrioritizationCheck, failsafeSection);
+        VBox advancedSection = new VBox(8, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck, failsafeSection);
         advancedSection.setPadding(new Insets(0, 0, 10, 0));
 
         // ── Action Button Section ─────────────────────────────────
@@ -306,8 +302,8 @@ public class ScriptOptions extends VBox {
             strategyOptions.put("expediteChance", getExpediteCollectionChance());
             // Add debug logging setting
             strategyOptions.put("debugLogging", isDebugLoggingEnabled());
-            // Add distance-based prioritization setting
-            strategyOptions.put("distanceBasedPrioritization", distanceBasedPrioritizationCheck.isSelected());
+            // Distance-based prioritization is now permanently enabled
+            // strategyOptions.put("distanceBasedPrioritization", true);
             
             // Add XP failsafe settings to strategy options
             strategyOptions.put("xpFailsafeEnabled", xpFailsafeCheck.isSelected());
