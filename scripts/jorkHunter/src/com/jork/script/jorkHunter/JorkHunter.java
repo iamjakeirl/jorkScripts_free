@@ -81,6 +81,7 @@ public class JorkHunter extends AbstractMetricsScript {
     // --- XP-Based Failsafe Settings ------------------------------------------
     private volatile boolean xpFailsafeEnabled = false;  // Whether XP failsafe is enabled
     private volatile int xpFailsafeTimeoutMinutes = 10;  // Minutes without XP before stopping
+    private volatile boolean xpFailsafePauseDuringLogout = true;  // Whether to pause during logout
     private long lastFailsafeWarningTime = 0;  // Track when we last warned about failsafe
     
     // --- Trap Prioritization Settings ----------------------------------------
@@ -196,11 +197,16 @@ public class JorkHunter extends AbstractMetricsScript {
             if (timeoutObj instanceof Integer) {
                 this.xpFailsafeTimeoutMinutes = (Integer) timeoutObj;
             }
+            Object pauseDuringLogoutObj = options.get("xpFailsafePauseDuringLogout");
+            if (pauseDuringLogoutObj instanceof Boolean) {
+                this.xpFailsafePauseDuringLogout = (Boolean) pauseDuringLogoutObj;
+            }
         }
         
         if (xpFailsafeEnabled) {
             ScriptLogger.info(this, "XP Failsafe ENABLED - will stop after " + 
-                             xpFailsafeTimeoutMinutes + " minutes without XP gains");
+                             xpFailsafeTimeoutMinutes + " minutes without XP gains" +
+                             (xpFailsafePauseDuringLogout ? " (pauses during logout)" : ""));
         } else {
             ScriptLogger.info(this, "XP Failsafe DISABLED");
         }
@@ -717,6 +723,28 @@ public class JorkHunter extends AbstractMetricsScript {
         
         return canBreakNow;
     }
+    
+    @Override
+    public boolean canHopWorlds() {
+        // Use same logic as canBreak() - prevent hops when traps are out
+        TrapStateManager trapManager = getTrapStateManager();
+        if (trapManager == null) {
+            return true;
+        }
+        
+        boolean hasTraps = !trapManager.isEmpty();
+        boolean hasPendingTransitions = trapManager.hasPendingGracePeriods();
+        
+        // Prevent hop if we have traps OR if traps are in transition
+        boolean canHopNow = !hasTraps && !hasPendingTransitions;
+        
+        if (!canHopNow) {
+            ScriptLogger.debug(this, "Preventing world hop - " + 
+                             (hasTraps ? "traps active" : "traps in transition"));
+        }
+        
+        return canHopNow;
+    }
 
     // --- Getter methods for tasks to access script state ---
     
@@ -1011,6 +1039,11 @@ public class JorkHunter extends AbstractMetricsScript {
                               else return (ms/60000) + "m " + ((ms%60000)/1000) + "s";
                           }, 
                           MetricType.TEXT);
+            
+            // Configure pause during logout if enabled
+            if (xpFailsafePauseDuringLogout) {
+                configureXPFailsafeTimerPause(true);
+            }
         }
     }
     
@@ -1050,7 +1083,6 @@ public class JorkHunter extends AbstractMetricsScript {
         super.onGameStateChanged(newGameState);
         
         // Check if we've transitioned away from being logged in
-        // This happens during world hops, disconnects, or manual logouts
         if (newGameState != null && newGameState != GameState.LOGGED_IN) {
             // We've logged out or are on login screen - all traps are lost
             if (huntTask != null) {
@@ -1072,9 +1104,21 @@ public class JorkHunter extends AbstractMetricsScript {
                 hasTriggeredExpedite = false;
                 ScriptLogger.info(this, "Reset drain mode flags due to logout");
             }
+            
+            // Pause XP failsafe timer when not logged in
+            if (xpFailsafePauseDuringLogout && xpFailsafeEnabled) {
+                pauseXPFailsafeTimer();
+                ScriptLogger.debug(this, "Paused XP failsafe timer - GameState: " + newGameState);
+            }
         } else if (newGameState == GameState.LOGGED_IN) {
             // We've logged back in
             ScriptLogger.info(this, "Logged back in - trap tracking cleared, will rescan for traps");
+            
+            // Resume XP failsafe timer when logged back in
+            if (xpFailsafePauseDuringLogout && xpFailsafeEnabled) {
+                resumeXPFailsafeTimer();
+                ScriptLogger.debug(this, "Resumed XP failsafe timer - GameState: LOGGED_IN");
+            }
         }
     }
     

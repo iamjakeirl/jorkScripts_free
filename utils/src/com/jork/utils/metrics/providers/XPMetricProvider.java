@@ -7,7 +7,6 @@ import com.osmb.api.ui.component.ComponentSearchResult;
 import com.osmb.api.ui.component.minimap.xpcounter.XPDropsComponent;
 import com.osmb.api.ui.component.tabs.skill.SkillType;
 import com.osmb.api.utils.RandomUtils;
-import com.osmb.api.utils.timing.Timer;
 import com.osmb.api.visual.color.ColorModel;
 import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
 import com.osmb.api.visual.image.SearchableImage;
@@ -27,7 +26,12 @@ public class XPMetricProvider {
     private XPTracker tracker;
     private Integer lastKnownXP;
     private int startingXP;
-    private Timer lastXPGainTimer;
+    
+    // Pausable timer implementation
+    private long accumulatedTimeMillis = 0;  // Time accumulated while logged in
+    private long sessionStartTime = 0;        // When current session started  
+    private boolean isPaused = false;         // Whether timer is paused
+    private boolean pauseDuringLogoutEnabled = true;  // Config option
     
     /**
      * Initializes the XP tracker for a specific skill using OCR
@@ -59,8 +63,10 @@ public class XPMetricProvider {
         // Ensure XP counter is visible
         ensureXPCounterVisible();
         
-        // Initialize the XP gain timer
-        this.lastXPGainTimer = new Timer();
+        // Initialize the pausable timer
+        this.sessionStartTime = System.currentTimeMillis();
+        this.accumulatedTimeMillis = 0;
+        this.isPaused = false;
         
         // Read initial XP
         Integer initialXP = readCurrentXP();
@@ -195,7 +201,13 @@ public class XPMetricProvider {
             
             // Only update if we got a valid reading and XP increased
             if (currentXP > lastKnownXP) {
-                lastXPGainTimer.reset();  // Reset timer on XP gain (OSMB API method)
+                // Only reset timer if not currently paused (e.g., not during break/hop preparation)
+                if (!isPaused) {
+                    accumulatedTimeMillis = 0;
+                    sessionStartTime = System.currentTimeMillis();
+                }
+                // Note: Don't change isPaused state here - only resumeTimer() should unpause
+                
                 double gained = currentXP - lastKnownXP;
                 tracker.incrementXp(gained);
                 int totalGained = currentXP - startingXP;
@@ -338,12 +350,46 @@ public class XPMetricProvider {
     }
     
     /**
+     * Sets whether the timer should pause during logout
+     * @param enabled Whether pause during logout is enabled
+     */
+    public void setPauseDuringLogout(boolean enabled) {
+        this.pauseDuringLogoutEnabled = enabled;
+    }
+    
+    /**
+     * Pauses the timer (for breaks/hops)
+     */
+    public void pauseTimer() {
+        if (!pauseDuringLogoutEnabled || isPaused) return;
+        
+        if (sessionStartTime > 0) {
+            accumulatedTimeMillis += System.currentTimeMillis() - sessionStartTime;
+            isPaused = true;
+            sessionStartTime = 0;
+        }
+    }
+    
+    /**
+     * Resumes the timer after pause
+     */
+    public void resumeTimer() {
+        if (!pauseDuringLogoutEnabled || !isPaused) return;
+        
+        sessionStartTime = System.currentTimeMillis();
+        isPaused = false;
+    }
+    
+    /**
      * Gets the time in milliseconds since the last XP gain
      * @return Time elapsed since last XP gain in milliseconds
      */
     public long getTimeSinceLastXPGain() {
-        if (lastXPGainTimer != null) {
-            return lastXPGainTimer.timeElapsed();  // Use OSMB Timer API
+        if (isPaused) {
+            return accumulatedTimeMillis;
+        }
+        if (sessionStartTime > 0) {
+            return accumulatedTimeMillis + (System.currentTimeMillis() - sessionStartTime);
         }
         return 0;
     }
@@ -353,9 +399,14 @@ public class XPMetricProvider {
      * @return Formatted time string (HH:mm:ss.SSS)
      */
     public String getTimeSinceLastXPGainFormatted() {
-        if (lastXPGainTimer != null) {
-            return lastXPGainTimer.getTimeElapsedFormatted();
-        }
-        return "00:00:00";
+        long timeElapsed = getTimeSinceLastXPGain();
+        
+        // Format as HH:mm:ss.SSS
+        long hours = timeElapsed / 3600000;
+        long minutes = (timeElapsed % 3600000) / 60000;
+        long seconds = (timeElapsed % 60000) / 1000;
+        long millis = timeElapsed % 1000;
+        
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis);
     }
 }

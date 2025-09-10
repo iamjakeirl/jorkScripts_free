@@ -198,4 +198,32 @@ public abstract class AbstractMetricsScript extends Script {
         }
         return "00:00:00";
     }
+    
+    /**
+     * Pauses the XP failsafe timer (for breaks/hops)
+     */
+    protected void pauseXPFailsafeTimer() {
+        if (metrics != null) {
+            metrics.pauseXPTimer();
+        }
+    }
+    
+    /**
+     * Resumes the XP failsafe timer after pause
+     */
+    protected void resumeXPFailsafeTimer() {
+        if (metrics != null) {
+            metrics.resumeXPTimer();
+        }
+    }
+    
+    /**
+     * Configures whether the XP failsafe timer should pause during logout
+     * @param pauseDuringLogout Whether to pause during logout
+     */
+    protected void configureXPFailsafeTimerPause(boolean pauseDuringLogout) {
+        if (metrics != null) {
+            metrics.configureXPTimerPause(pauseDuringLogout);
+        }
+    }
 }

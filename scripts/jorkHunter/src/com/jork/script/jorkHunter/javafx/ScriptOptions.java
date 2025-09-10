@@ -49,6 +49,7 @@ public class ScriptOptions extends VBox {
     // Removed distance-based prioritization checkbox - now permanently enabled
     private final CheckBox xpFailsafeCheck;
     private final TextField xpFailsafeTimeoutInput;
+    private final CheckBox xpFailsafePauseDuringLogoutCheck;
     
     // Dynamic strategy options
     private VBox strategyOptionsContainer;
@@ -258,11 +259,20 @@ public class ScriptOptions extends VBox {
         Label minutesLabel = new Label("minutes");
         minutesLabel.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 10px;");
         
-        // Enable/disable timeout input based on checkbox
+        // Create pause during logout checkbox before the listener
+        xpFailsafePauseDuringLogoutCheck = new CheckBox("Pause timer during breaks/hops");
+        xpFailsafePauseDuringLogoutCheck.setStyle(getCheckBoxStyle());
+        xpFailsafePauseDuringLogoutCheck.setSelected(true); // Default enabled
+        xpFailsafePauseDuringLogoutCheck.setDisable(!xpFailsafeCheck.isSelected());
+        xpFailsafePauseDuringLogoutCheck.setPadding(new Insets(0, 0, 0, 20));
+        
+        // Enable/disable timeout input and pause checkbox based on main checkbox
         xpFailsafeCheck.selectedProperty().addListener((obs, oldVal, newVal) -> {
             xpFailsafeTimeoutInput.setDisable(!newVal);
+            xpFailsafePauseDuringLogoutCheck.setDisable(!newVal);
             if (!newVal) {
                 xpFailsafeTimeoutInput.setText("5");
+                xpFailsafePauseDuringLogoutCheck.setSelected(true);
             }
         });
         
@@ -274,7 +284,13 @@ public class ScriptOptions extends VBox {
         failsafeInfo.setWrapText(true);
         failsafeInfo.setPadding(new Insets(0, 0, 0, 20));
         
-        VBox failsafeSection = new VBox(5, failsafeSectionLabel, failsafeBox, failsafeInfo);
+        Label pauseInfo = new Label("Prevents false triggers when logged out");
+        pauseInfo.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 9px;");
+        pauseInfo.setWrapText(true);
+        pauseInfo.setPadding(new Insets(0, 0, 0, 40));
+        
+        VBox failsafeSection = new VBox(5, failsafeSectionLabel, failsafeBox, failsafeInfo, 
+                                        xpFailsafePauseDuringLogoutCheck, pauseInfo);
         failsafeSection.setPadding(new Insets(8, 0, 0, 0));
 
         VBox advancedSection = new VBox(8, advancedSectionLabel, levelRow, expediteBox, debugLoggingCheck, failsafeSection);
@@ -307,6 +323,7 @@ public class ScriptOptions extends VBox {
             
             // Add XP failsafe settings to strategy options
             strategyOptions.put("xpFailsafeEnabled", xpFailsafeCheck.isSelected());
+            strategyOptions.put("xpFailsafePauseDuringLogout", xpFailsafePauseDuringLogoutCheck.isSelected());
             try {
                 int timeout = Integer.parseInt(xpFailsafeTimeoutInput.getText());
                 timeout = Math.max(1, Math.min(60, timeout)); // Clamp between 1-60 minutes

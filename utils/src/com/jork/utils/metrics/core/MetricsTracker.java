@@ -247,4 +247,32 @@ public class MetricsTracker {
     public XPMetricProvider getXPProvider() {
         return xpProvider;
     }
+    
+    /**
+     * Pauses the XP timer (for breaks/hops)
+     */
+    public void pauseXPTimer() {
+        if (xpProvider != null) {
+            xpProvider.pauseTimer();
+        }
+    }
+    
+    /**
+     * Resumes the XP timer after pause
+     */
+    public void resumeXPTimer() {
+        if (xpProvider != null) {
+            xpProvider.resumeTimer();
+        }
+    }
+    
+    /**
+     * Configures whether the XP timer should pause during logout
+     * @param pauseDuringLogout Whether to pause during logout
+     */
+    public void configureXPTimerPause(boolean pauseDuringLogout) {
+        if (xpProvider != null) {
+            xpProvider.setPauseDuringLogout(pauseDuringLogout);
+        }
+    }
 }

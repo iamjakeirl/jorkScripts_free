@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "osmbMCP": {
+      "type": "stdio",
+      "command": "/home/jork/projects/cursor/osmbmcp/run_mcp_server.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}
