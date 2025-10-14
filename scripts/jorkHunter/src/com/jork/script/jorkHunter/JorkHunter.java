@@ -723,28 +723,6 @@ public class JorkHunter extends AbstractMetricsScript {
         
         return canBreakNow;
     }
-    
-    @Override
-    public boolean canHopWorlds() {
-        // Use same logic as canBreak() - prevent hops when traps are out
-        TrapStateManager trapManager = getTrapStateManager();
-        if (trapManager == null) {
-            return true;
-        }
-        
-        boolean hasTraps = !trapManager.isEmpty();
-        boolean hasPendingTransitions = trapManager.hasPendingGracePeriods();
-        
-        // Prevent hop if we have traps OR if traps are in transition
-        boolean canHopNow = !hasTraps && !hasPendingTransitions;
-        
-        if (!canHopNow) {
-            ScriptLogger.debug(this, "Preventing world hop - " + 
-                             (hasTraps ? "traps active" : "traps in transition"));
-        }
-        
-        return canHopNow;
-    }
 
     // --- Getter methods for tasks to access script state ---
     
@@ -988,6 +966,8 @@ public class JorkHunter extends AbstractMetricsScript {
             // Specific animal names (legacy support)
             case "crimson swift", "copper longtail", "tropical wagtail", "cerulean twitch" -> TrapType.BIRD_SNARE;
             case "grey chinchompa", "red chinchompa", "black chinchompa", "chinchompa" -> TrapType.CHINCHOMPA;
+            // Box trap creatures (jerboas and ferrets)
+            case "embertailed jerboa", "ferret" -> TrapType.CHINCHOMPA;
             default -> TrapType.BIRD_SNARE; // Default fallback
         };
         

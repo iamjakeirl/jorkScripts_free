@@ -90,8 +90,8 @@ public enum TrapType {
         new String[] { "lay", "take", "pick-up" }, // Collapsed trap actions (lay first for efficiency)
         new String[] { "reset" }, // Reset actions (chinchompas support reset for finished traps)
         new int[] { 
-            // Empty - chinchompas are valuable and should be kept!
-        }, // Drop items (empty - chinchompas are kept)
+            ItemID.FERRET  // Drop ferrets when inventory is nearly full
+        }, // Drop items (ferrets only - chinchompas and jerboas are kept)
         1.5, // Tap area Y-scale factor
         TrapStateHandlingMode.TERNARY // Use ternary mode for chinchompas to distinguish success/failed
     );

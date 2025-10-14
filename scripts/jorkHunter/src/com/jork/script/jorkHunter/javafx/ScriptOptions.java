@@ -111,7 +111,9 @@ public class ScriptOptions extends VBox {
             targetDropdown.getItems().addAll(
                 "Grey Chinchompa",
                 "Red Chinchompa",
-                "Black Chinchompa"
+                "Black Chinchompa",
+                "Embertailed Jerboa",
+                "Ferret"
             );
         }
         
@@ -125,7 +127,9 @@ public class ScriptOptions extends VBox {
                 "Cerulean Twitch",
                 "Grey Chinchompa",
                 "Red Chinchompa",
-                "Black Chinchompa"
+                "Black Chinchompa",
+                "Embertailed Jerboa",
+                "Ferret"
             );
         }
         
