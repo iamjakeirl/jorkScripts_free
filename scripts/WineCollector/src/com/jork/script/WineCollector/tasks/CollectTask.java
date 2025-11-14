@@ -1,311 +1,168 @@
 package com.jork.script.WineCollector.tasks;
 
 import com.osmb.api.location.position.types.WorldPosition;
-import com.osmb.api.scene.ObjectManager;
-import com.osmb.api.scene.RSObject;
-import com.osmb.api.visual.PixelAnalyzer;
-import com.osmb.api.visual.PixelCluster;
-import com.osmb.api.visual.SearchablePixel;
-import com.osmb.api.visual.color.ColorModel;
-import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
 import com.osmb.api.item.ItemGroupResult;
 import java.util.Set;
-import com.osmb.api.shape.Polygon;
-import com.osmb.api.utils.RandomUtils;
 import com.osmb.api.profile.ProfileManager;
+import com.osmb.api.utils.RandomUtils;
 import com.jork.utils.ScriptLogger;
-import com.jork.utils.Navigation;
 import com.jork.script.WineCollector.WineCollector;
 import com.jork.script.WineCollector.config.WineConfig;
 
+import com.osmb.api.shape.Polygon;
+import com.osmb.api.visual.SearchablePixel;
+import com.osmb.api.visual.color.ColorModel;
+import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
+import com.osmb.api.input.MenuEntry;
+
 import java.awt.Point;
-import java.util.Optional;
-import java.util.Random;
-import java.util.List;
 
 public class CollectTask implements Task {
 
     private final WineCollector script;
-    private final Random random = new Random();
-    private final Navigation navigation;
 
     public CollectTask(WineCollector script) {
         this.script = script;
-        this.navigation = new Navigation(script);
+    }
+
+    /**
+     * Detects if wine is present at the spawn position using color detection.
+     * @param winePos The world position to check for wine
+     * @return true if wine color pixels are found, false otherwise
+     */
+    private boolean detectWine(WorldPosition winePos) {
+        // Get tile cube for wine position
+        Polygon wineCube = script.getSceneProjector().getTileCube(winePos, WineConfig.WINE_CUBE_HEIGHT);
+        if (wineCube == null) {
+            ScriptLogger.debug(script, "Wine cube not on screen");
+            return false;
+        }
+
+        // Resize cube to fit wine bottle model better
+        Polygon resizedCube = wineCube.getResized(WineConfig.WINE_CUBE_RESIZE_FACTOR);
+
+        // Define wine pixel color with tolerance
+        SearchablePixel winePixel = new SearchablePixel(
+            WineConfig.WINE_BOTTLE_COLOR,
+            new SingleThresholdComparator(WineConfig.WINE_COLOR_TOLERANCE),
+            ColorModel.HSL  // HSL for better lighting tolerance
+        );
+
+        // Search for wine color in the cube
+        Point foundPixel = script.getPixelAnalyzer().findPixel(resizedCube, winePixel);
+
+        boolean detected = foundPixel != null;
+        ScriptLogger.debug(script, "Wine detection result: " + (detected ? "FOUND" : "NOT FOUND"));
+
+        return detected;
+    }
+
+    /**
+     * Attempts to pick up wine using menu hook interaction.
+     * @param winePos The world position of the wine
+     * @return true if wine was successfully picked up, false otherwise
+     */
+    private boolean pickupWine(WorldPosition winePos) {
+        // Get tile cube
+        Polygon wineCube = script.getSceneProjector().getTileCube(winePos, WineConfig.WINE_CUBE_HEIGHT);
+        if (wineCube == null) {
+            ScriptLogger.warning(script, "Wine cube not visible for pickup");
+            return false;
+        }
+
+        // Resize for better hit detection
+        Polygon resizedCube = wineCube.getResized(WineConfig.WINE_CUBE_RESIZE_FACTOR);
+
+        // Track if we found the correct menu entry
+        boolean[] wineEntryFound = {false};
+
+        // Tap with menu hook
+        boolean tapped = script.submitHumanTask(() ->
+            script.getFinger().tapGameScreen(resizedCube, (menuEntries) -> {
+                // Search for "Take" action on "Eclipse red"
+                for (MenuEntry entry : menuEntries) {
+                    String action = entry.getAction();
+                    String rawText = entry.getRawText();
+
+                    if (action != null && rawText != null) {
+                        String actionLower = action.toLowerCase();
+                        String rawLower = rawText.toLowerCase();
+
+                        if (actionLower.contains("take") && rawLower.contains("eclipse red")) {
+                            wineEntryFound[0] = true;
+                            ScriptLogger.actionAttempt(script, "Taking " + WineConfig.WINE_NAME);
+                            return entry;  // Select this menu entry
+                        }
+                    }
+                }
+
+                // No wine found in menu
+                ScriptLogger.warning(script, "Wine menu entry not found - will force hop");
+                return null;  // Cancel menu
+            }), 3000);
+
+        if (!tapped) {
+            ScriptLogger.warning(script, "Failed to tap wine cube");
+            return false;
+        }
+
+        return wineEntryFound[0];
     }
 
     @Override
     public boolean canExecute() {
-        // Execute if inventory is not full
-        ItemGroupResult result = script.getWidgetManager().getInventory().search(Set.of());
-        if (result == null) return true; // If can't check, assume we can collect
-        return result.getOccupiedSlotCount() < WineConfig.INVENTORY_SIZE;
+        // Always allow CollectTask to run - inventory check happens after wine detection
+        return true;
     }
 
     @Override
     public int execute() {
-        // Step 1: Check current floor
-        WorldPosition currentPos = script.getWorldPosition();
-        if (currentPos == null) {
-            ScriptLogger.warning(script, "Cannot determine current position");
-            return WineConfig.POLL_DELAY_LONG;
-        }
-        
-        int currentPlane = currentPos.getPlane();
-        
-        // Step 2: Navigate to ladder if on ground floor
-        if (currentPlane == WineConfig.GROUND_FLOOR_PLANE) {
-            if (!WineConfig.LADDER_AREA.contains(currentPos)) {
-                ScriptLogger.info(script, "Moving to ladder area");
-                boolean navigating = navigation.navigateTo(WineConfig.LADDER_AREA);
-                return navigating ? WineConfig.POLL_DELAY_MEDIUM : WineConfig.POLL_DELAY_LONG;
-            }
-            
-            // Step 3: Climb first ladder from ground to second floor
-            ScriptLogger.actionAttempt(script, "Climbing first ladder up");
-            RSObject ladder = script.getObjectManager().getClosestObject(WineConfig.LADDER_NAME);
-            
-            if (ladder == null) {
-                ScriptLogger.warning(script, "Cannot find ladder");
-                return WineConfig.POLL_DELAY_LONG;
-            }
-            
-            boolean interacted = ladder.interact(WineConfig.LADDER_UP_ACTION);
-            if (!interacted) {
-                ScriptLogger.warning(script, "Failed to interact with first ladder");
-                return WineConfig.POLL_DELAY_LONG;
-            }
-            
-            // Wait for climb to second floor
-            boolean climbed = script.pollFramesHuman(() -> {
-                WorldPosition pos = script.getWorldPosition();
-                return pos != null && pos.getPlane() == WineConfig.SECOND_FLOOR_PLANE;
-            }, WineConfig.LADDER_CLIMB_TIMEOUT);
-            
-            if (climbed) {
-                ScriptLogger.actionSuccess(script, "Climbed to second floor");
-            } else {
-                ScriptLogger.actionFailure(script, "First ladder climb", 1, 1);
-            }
-            
-            return WineConfig.POLL_DELAY_MEDIUM;
-        }
-        
-        // Step 3b: If on second floor, climb to top floor
-        if (currentPlane == WineConfig.SECOND_FLOOR_PLANE) {
-            ScriptLogger.actionAttempt(script, "Climbing second ladder to top floor");
-            
-            // Get all ladders and select the furthest one
-            List<RSObject> ladders = script.getObjectManager().getObjects(obj -> 
-                obj != null && obj.getName() != null && 
-                obj.getName().equals(WineConfig.LADDER_NAME) && 
-                obj.canReach()
+        // Assumes NavigateTask has already positioned us on the top floor
+
+        // Wine detection and collection
+        if (detectWine(WineConfig.WINE_SPAWN_POSITION)) {
+            ScriptLogger.info(script, "Wine detected at spawn position");
+
+            // Human delay to simulate checking inventory visually (randomized timeout)
+            int inventoryCheckDelay = RandomUtils.weightedRandom(
+                WineConfig.INVENTORY_CHECK_DELAY - 100,
+                WineConfig.INVENTORY_CHECK_DELAY + 100
             );
-            
-            if (ladders == null || ladders.isEmpty()) {
-                ScriptLogger.warning(script, "No ladders found on second floor");
-                return WineConfig.POLL_DELAY_LONG;
+            script.pollFramesHuman(() -> true, inventoryCheckDelay);
+
+            // Check inventory AFTER detecting wine
+            ItemGroupResult result = script.getWidgetManager().getInventory().search(Set.of());
+            if (result != null && result.getOccupiedSlotCount() >= WineConfig.INVENTORY_SIZE) {
+                ScriptLogger.info(script, "Inventory full - switching to banking");
+                script.setShouldBank(true);
+                return WineConfig.POLL_DELAY_MEDIUM;  // Let BankTask take over
             }
-            
-            // Sort by distance (furthest first)
-            ladders.sort((a, b) -> 
-                Double.compare(
-                    b.distance(currentPos), 
-                    a.distance(currentPos)
-                )
-            );
-            
-            RSObject furthestLadder = ladders.get(0);
-            ScriptLogger.debug(script, "Using ladder at distance: " + furthestLadder.distance(currentPos));
-            
-            boolean interacted = furthestLadder.interact(WineConfig.LADDER_UP_ACTION);
-            if (!interacted) {
-                ScriptLogger.warning(script, "Failed to interact with second ladder");
-                return WineConfig.POLL_DELAY_LONG;
-            }
-            
-            // Wait for climb to top floor
-            boolean climbed = script.pollFramesHuman(() -> {
-                WorldPosition pos = script.getWorldPosition();
-                return pos != null && pos.getPlane() == WineConfig.TOP_FLOOR_PLANE;
-            }, WineConfig.LADDER_CLIMB_TIMEOUT);
-            
-            if (climbed) {
-                ScriptLogger.actionSuccess(script, "Climbed to top floor");
-            } else {
-                ScriptLogger.actionFailure(script, "Second ladder climb", 1, 1);
-            }
-            
-            return WineConfig.POLL_DELAY_MEDIUM;
-        }
-        
-        // Step 4: Check for wine (we should be on top floor)
-        if (currentPlane != WineConfig.TOP_FLOOR_PLANE) {
-            ScriptLogger.warning(script, "Not on top floor, current plane: " + currentPlane);
-            return WineConfig.POLL_DELAY_LONG;
-        }
-        
-        ScriptLogger.debug(script, "Checking for wine at spawn position");
-        
-        // Get tile cube for wine spawn position
-        Polygon tileCube = script.getSceneProjector().getTileCube(
-            WineConfig.WINE_SPAWN_POSITION, 
-            WineConfig.TILE_CUBE_HEIGHT
-        );
-        
-        if (tileCube == null) {
-            ScriptLogger.debug(script, "Wine spawn position not visible on screen");
-            // Try to move closer to wine spawn position
-            navigation.simpleMoveTo(WineConfig.WINE_SPAWN_POSITION, 5000, 5);
-            return WineConfig.POLL_DELAY_LONG;
-        }
-        
-        // Check for wine using pixel detection
-        boolean wineDetected = wineDetected(tileCube);
-        
-        if (wineDetected) {
-            // Step 5: Pick up wine
-            ScriptLogger.actionAttempt(script, "Picking up Eclipse Red");
-            
-            Point tapPoint = getRandomPointInPolygon(tileCube);
-            if (tapPoint == null) {
-                ScriptLogger.warning(script, "Failed to get tap point in tile cube");
-                return WineConfig.POLL_DELAY_MEDIUM;
-            }
-            
-            // Tap to pick up wine
-            boolean tapped = script.getFinger().tap(tapPoint.x, tapPoint.y);
-            if (!tapped) {
-                ScriptLogger.warning(script, "Failed to tap wine location");
-                return WineConfig.POLL_DELAY_MEDIUM;
-            }
-            
-            // Wait for pickup with human-like delay
-            ItemGroupResult initialResult = script.getWidgetManager().getInventory().search(Set.of(WineConfig.WINE_ID));
-            int initialCount = initialResult != null ? initialResult.getAmount(WineConfig.WINE_ID) : 0;
-            boolean pickedUp = script.pollFramesHuman(() -> {
-                ItemGroupResult currentResult = script.getWidgetManager().getInventory().search(Set.of(WineConfig.WINE_ID));
-                int currentCount = currentResult != null ? currentResult.getAmount(WineConfig.WINE_ID) : 0;
-                return currentCount > initialCount;
-            }, WineConfig.PICKUP_TIMEOUT);
-            
+
+            boolean pickedUp = pickupWine(WineConfig.WINE_SPAWN_POSITION);
+
             if (pickedUp) {
+                // Wait for wine to appear in inventory (non-human task check)
+                script.submitTask(() -> {
+                    ItemGroupResult invCheck = script.getWidgetManager()
+                        .getInventory().search(Set.of(WineConfig.WINE_ID));
+                    return invCheck != null && invCheck.getAmount(WineConfig.WINE_ID) > 0;
+                }, WineConfig.PICKUP_TIMEOUT);
+
                 script.incrementWineCount();
-                ScriptLogger.actionSuccess(script, "Wine picked up successfully");
+                ScriptLogger.info(script, "Wine collected successfully");
+                return WineConfig.POLL_DELAY_SHORT;
             } else {
-                ScriptLogger.actionFailure(script, "Wine pickup", 1, 1);
+                // Menu entry not found - force hop
+                ScriptLogger.warning(script, "Failed to pick up wine - forcing world hop");
             }
-        } else {
-            ScriptLogger.debug(script, "No wine detected at spawn position");
         }
-        
-        // Step 6: World hop
-        ScriptLogger.info(script, "Preparing to hop worlds");
-        
-        // Add human-like delay before hopping
-        int hopDelay = RandomUtils.weightedRandom(WineConfig.HOP_DELAY_MIN, WineConfig.HOP_DELAY_MAX);
-        script.pollFramesHuman(() -> false, hopDelay);
-        
+
+        // No wine found or pickup failed - hop worlds
         ProfileManager profileManager = script.getProfileManager();
         if (profileManager != null && profileManager.hasHopProfile()) {
-            boolean hopInitiated = profileManager.forceHop();
-            if (hopInitiated) {
-                ScriptLogger.info(script, "World hop initiated");
-            } else {
-                ScriptLogger.warning(script, "Failed to initiate world hop");
-            }
-        } else {
-            ScriptLogger.warning(script, "No hop profile configured");
+            profileManager.forceHop();
         }
-        
+
         return WineConfig.POLL_DELAY_WORLD_HOP;
-    }
-
-    private boolean wineDetected(Polygon area) {
-        if (area == null) {
-            return false;
-        }
-        
-        try {
-            PixelAnalyzer analyzer = script.getPixelAnalyzer();
-            if (analyzer == null) {
-                ScriptLogger.warning(script, "PixelAnalyzer not available");
-                return false;
-            }
-            
-            // Create searchable pixel for wine color
-            SearchablePixel winePixel = new SearchablePixel(
-                WineConfig.WINE_PIXEL_COLOR,
-                new SingleThresholdComparator(WineConfig.PIXEL_COLOR_TOLERANCE),
-                ColorModel.RGB
-            );
-            
-            // Create cluster query for wine colors
-            PixelCluster.ClusterQuery query = new PixelCluster.ClusterQuery(
-                WineConfig.PIXEL_COLOR_TOLERANCE,  // max distance
-                WineConfig.MIN_CLUSTER_SIZE,       // min size
-                new SearchablePixel[] { winePixel } // searchable pixels
-            );
-            
-            // Find clusters in the tile cube area
-            PixelCluster.ClusterSearchResult result = analyzer.findClusters(area, query);
-            
-            if (result != null) {
-                List<PixelCluster> clusters = result.getClusters();
-                boolean found = clusters != null && !clusters.isEmpty();
-                
-                if (found) {
-                    ScriptLogger.debug(script, "Wine detected: " + clusters.size() + " pixel clusters found");
-                }
-                
-                return found;
-            }
-        } catch (Exception e) {
-            ScriptLogger.exception(script, "wine detection", e);
-        }
-        
-        return false;
-    }
-
-    private Point getRandomPointInPolygon(Polygon poly) {
-        if (poly == null) {
-            return null;
-        }
-        
-        try {
-            // Get the bounds of the polygon
-            com.osmb.api.shape.Rectangle shapeBounds = poly.getBounds();
-            if (shapeBounds == null) {
-                return null;
-            }
-            
-            // Convert to awt Rectangle for random point generation
-            java.awt.Rectangle bounds = new java.awt.Rectangle(
-                shapeBounds.getX(), 
-                shapeBounds.getY(), 
-                shapeBounds.getWidth(), 
-                shapeBounds.getHeight()
-            );
-            
-            // Try up to 100 times to find a point inside the polygon
-            for (int i = 0; i < 100; i++) {
-                int x = bounds.x + random.nextInt(bounds.width);
-                int y = bounds.y + random.nextInt(bounds.height);
-                Point point = new Point(x, y);
-                
-                if (poly.contains(point)) {
-                    return point;
-                }
-            }
-            
-            // Fallback to center of bounds if we can't find a point inside
-            return new Point(
-                bounds.x + bounds.width / 2,
-                bounds.y + bounds.height / 2
-            );
-        } catch (Exception e) {
-            ScriptLogger.exception(script, "getting random point in polygon", e);
-            return null;
-        }
     }
 }

@@ -1,14 +1,22 @@
 package com.jork.script.WineCollector;
 
-import com.osmb.api.script.Script;
 import com.osmb.api.script.ScriptDefinition;
 import com.osmb.api.script.SkillCategory;
 import com.osmb.api.visual.drawing.Canvas;
-import com.jork.utils.ScriptLogger;
-import com.jork.utils.metrics.core.MetricsTracker;
+import com.osmb.api.shape.Polygon;
+import com.osmb.api.shape.Rectangle;
+import com.osmb.api.visual.SearchablePixel;
+import com.osmb.api.visual.color.ColorModel;
+import com.osmb.api.visual.color.tolerance.impl.SingleThresholdComparator;
+import com.jork.utils.metrics.AbstractMetricsScript;
 import com.jork.utils.metrics.core.MetricType;
+import com.jork.utils.ScriptLogger;
 import com.jork.script.WineCollector.tasks.*;
 import com.jork.script.WineCollector.config.WineConfig;
+import com.osmb.api.item.ItemGroupResult;
+
+import java.awt.Point;
+import java.util.Set;
 
 @ScriptDefinition(
     name = "Wine Collector",
@@ -17,54 +25,38 @@ import com.jork.script.WineCollector.config.WineConfig;
     description = "Collects Eclipse Red wines in Varlamore Hunting Guild",
     skillCategory = SkillCategory.OTHER
 )
-public class WineCollector extends Script {
+public class WineCollector extends AbstractMetricsScript {
 
     private TaskManager taskManager;
-    private MetricsTracker metricsTracker;
     private int wineCount = 0;
-    private long startTime;
-    private int winesPerHour = 0;
+    private boolean shouldBank = false;
 
     public WineCollector(Object scriptCore) {
         super(scriptCore);
     }
 
     @Override
-    public void onStart() {
-        startTime = System.currentTimeMillis();
-        
-        ScriptLogger.startup(this, "1.0", "jork", "Eclipse Red Wine Collection");
-        
-        // Initialize TaskManager
+    protected void onMetricsStart() {
+        // Check inventory on startup to set initial shouldBank flag
+        ItemGroupResult startupInventory = getWidgetManager().getInventory().search(Set.of());
+        if (startupInventory != null && startupInventory.getOccupiedSlotCount() >= WineConfig.INVENTORY_SIZE) {
+            shouldBank = true;
+            ScriptLogger.info(this, "Inventory full on startup - will navigate to bank");
+        } else {
+            shouldBank = false;
+            ScriptLogger.info(this, "Inventory has space on startup - will navigate to collection area");
+        }
+
         taskManager = new TaskManager(this);
-        
-        // Create and add tasks
-        CollectTask collectTask = new CollectTask(this);
+
+        NavigateTask navigateTask = new NavigateTask(this);
         BankTask bankTask = new BankTask(this);
-        taskManager.addTasks(bankTask, collectTask); // Bank task has priority when inventory is full
-        
-        // Initialize MetricsTracker
-        metricsTracker = new MetricsTracker(this);
-        
-        // Register runtime metrics
-        metricsTracker.registerRuntimeMetrics();
-        
-        // Register wine collection metrics
-        metricsTracker.register("Wines Collected", 
-            () -> wineCount, 
-            MetricType.NUMBER);
-        
-        metricsTracker.register("Wines/Hour", 
-            () -> calculateWinesPerHour(), 
-            MetricType.RATE,
-            "%,d/hr");
-        
-        metricsTracker.register("Total Value", 
-            () -> wineCount * WineConfig.WINE_VALUE, 
-            MetricType.NUMBER,
-            "%,d gp");
-        
-        ScriptLogger.info(this, "Initialization complete. Starting wine collection...");
+        CollectTask collectTask = new CollectTask(this);
+        taskManager.addTasks(navigateTask, bankTask, collectTask);
+
+        registerMetric("Wines Collected", () -> wineCount, MetricType.NUMBER);
+        registerMetric("Wines/Hour", () -> wineCount, MetricType.RATE, "%,d/hr");
+        registerMetric("Total Value", () -> wineCount * WineConfig.WINE_VALUE, MetricType.NUMBER, "%,d gp");
     }
 
     @Override
@@ -73,60 +65,97 @@ public class WineCollector extends Script {
     }
 
     @Override
-    public void onPaint(Canvas canvas) {
-        // Update wines per hour calculation
-        winesPerHour = calculateWinesPerHour();
-        
-        // Render metrics display
-        if (metricsTracker != null) {
-            metricsTracker.render(canvas);
+    protected void onMetricsPaint(Canvas canvas) {
+        try {
+            // Draw wine spawn tile cube visualization
+            drawWineSpawnCube(canvas);
+        } catch (Exception e) {
+            // Silently catch painting errors to avoid disrupting the script
         }
     }
 
-    public void onStop() {
-        ScriptLogger.shutdown(this, "Script stopped by user");
-        
-        // Log final statistics
-        int totalValue = wineCount * WineConfig.WINE_VALUE;
-        ScriptLogger.info(this, "Final Statistics:");
-        ScriptLogger.info(this, "Wines collected: " + wineCount);
-        ScriptLogger.info(this, "Total value: " + totalValue + " gp");
-        
-        long runtime = System.currentTimeMillis() - startTime;
-        long hours = runtime / 3600000;
-        long minutes = (runtime % 3600000) / 60000;
-        ScriptLogger.info(this, "Runtime: " + hours + " hours, " + minutes + " minutes");
+    /**
+     * Draws debug visualization for the wine spawn position.
+     * Shows the tile cube in cyan, filled with green if wine is detected.
+     */
+    private void drawWineSpawnCube(Canvas canvas) {
+        // Get tile cube for wine spawn position
+        Polygon wineCube = getSceneProjector().getTileCube(
+            WineConfig.WINE_SPAWN_POSITION,
+            WineConfig.WINE_CUBE_HEIGHT
+        );
+
+        if (wineCube == null) {
+            return;  // Wine position not on screen
+        }
+
+        // Resize to match detection logic
+        Polygon resizedCube = wineCube.getResized(WineConfig.WINE_CUBE_RESIZE_FACTOR);
+
+        // Check if wine is detected
+        boolean wineDetected = detectWineForDebug(resizedCube);
+
+        if (wineDetected) {
+            // Fill with semi-transparent green if wine found
+            canvas.fillPolygon(resizedCube, 0x00FF00, 0.3);  // Green with 30% opacity
+            canvas.drawPolygon(resizedCube, 0x00FF00, 1.0);  // Bright green outline
+        } else {
+            // Fill with semi-transparent cyan if no wine
+            canvas.fillPolygon(resizedCube, 0x00FFFF, 0.2);  // Cyan with 20% opacity
+            canvas.drawPolygon(resizedCube, 0x00FFFF, 1.0);  // Bright cyan outline
+        }
+
+        // Draw text label
+        Rectangle bounds = resizedCube.getBounds();
+        if (bounds != null) {
+            int centerX = bounds.x + bounds.width / 2;
+            int centerY = bounds.y + bounds.height / 2;
+
+            String statusText = wineDetected ? "WINE FOUND" : "NO WINE";
+            int textColor = wineDetected ? 0x00FF00 : 0xFFFFFF;
+
+            canvas.drawText(statusText, centerX - 30, centerY - 10, textColor,
+                new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+        }
     }
 
     /**
-     * Called by tasks when a wine is collected
+     * Helper method to detect wine for debug painting (simplified version).
+     * @param resizedCube The resized tile cube to check
+     * @return true if wine color is detected
      */
+    private boolean detectWineForDebug(Polygon resizedCube) {
+        try {
+            SearchablePixel winePixel = new SearchablePixel(
+                WineConfig.WINE_BOTTLE_COLOR,
+                new SingleThresholdComparator(WineConfig.WINE_COLOR_TOLERANCE),
+                ColorModel.HSL
+            );
+
+            Point foundPixel = getPixelAnalyzer().findPixel(resizedCube, winePixel);
+            return foundPixel != null;
+        } catch (Exception e) {
+            return false;  // Return false if detection fails
+        }
+    }
+
+    @Override
+    protected void onMetricsStop() {
+    }
+
     public void incrementWineCount() {
         wineCount++;
-        ScriptLogger.info(this, "Wine collected! Total: " + wineCount);
     }
 
-    /**
-     * Calculate wines collected per hour
-     */
-    private int calculateWinesPerHour() {
-        if (wineCount == 0 || startTime == 0) {
-            return 0;
-        }
-        
-        long runtime = System.currentTimeMillis() - startTime;
-        if (runtime < 1000) { // Less than 1 second
-            return 0;
-        }
-        
-        double hoursRun = runtime / 3600000.0;
-        return (int) (wineCount / hoursRun);
-    }
-
-    /**
-     * Get the current wine count
-     */
     public int getWineCount() {
         return wineCount;
+    }
+
+    public void setShouldBank(boolean shouldBank) {
+        this.shouldBank = shouldBank;
+    }
+
+    public boolean shouldBank() {
+        return shouldBank;
     }
 }
