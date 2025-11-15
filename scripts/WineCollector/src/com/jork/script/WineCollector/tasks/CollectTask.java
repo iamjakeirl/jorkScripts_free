@@ -133,9 +133,9 @@ public class CollectTask implements Task {
             // Check inventory AFTER detecting wine
             ItemGroupResult result = script.getWidgetManager().getInventory().search(Set.of());
             if (result != null && result.getOccupiedSlotCount() >= WineConfig.INVENTORY_SIZE) {
-                ScriptLogger.info(script, "Inventory full - switching to banking");
-                script.setShouldBank(true);
-                return WineConfig.POLL_DELAY_MEDIUM;  // Let BankTask take over
+                ScriptLogger.info(script, "Inventory full - stopping script");
+                script.stop();
+                return WineConfig.POLL_DELAY_LONG;
             }
 
             boolean pickedUp = pickupWine(WineConfig.WINE_SPAWN_POSITION);

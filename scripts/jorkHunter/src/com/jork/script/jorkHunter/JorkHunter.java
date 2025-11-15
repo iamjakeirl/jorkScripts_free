@@ -306,7 +306,7 @@ public class JorkHunter extends AbstractMetricsScript {
             return;
         }
         
-        submitHumanTask(() -> {
+        pollFramesHuman(() -> {
             if (!getWidgetManager().getInventory().isOpen()) {
                 return getWidgetManager().getInventory().open();
             }

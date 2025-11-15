@@ -1,0 +1,82 @@
+package com.jork.script.Ectofuntus.config;
+
+/**
+ * Configuration class for Ectofuntus script settings.
+ * Holds user-selected options from the UI.
+ *
+ * @author jork
+ */
+public class EctoConfig {
+
+    private final BoneType boneType;
+    private final BankLocation bankLocation;
+    private final boolean xpFailsafeEnabled;
+    private final int xpFailsafeTimeoutMinutes;
+    private final boolean xpFailsafePauseDuringLogout;
+    private final boolean debugLogging;
+
+    public EctoConfig(
+        BoneType boneType,
+        BankLocation bankLocation,
+        boolean xpFailsafeEnabled,
+        int xpFailsafeTimeoutMinutes,
+        boolean xpFailsafePauseDuringLogout,
+        boolean debugLogging
+    ) {
+        this.boneType = boneType;
+        this.bankLocation = bankLocation;
+        this.xpFailsafeEnabled = xpFailsafeEnabled;
+        this.xpFailsafeTimeoutMinutes = xpFailsafeTimeoutMinutes;
+        this.xpFailsafePauseDuringLogout = xpFailsafePauseDuringLogout;
+        this.debugLogging = debugLogging;
+    }
+
+    /**
+     * Returns a default configuration for use when window is closed without confirming.
+     */
+    public static EctoConfig getDefault() {
+        return new EctoConfig(
+            BoneType.DRAGON_BONES,
+            BankLocation.RING_OF_DUELING,
+            true,   // XP failsafe enabled
+            5,      // 5 minute timeout
+            true,   // Pause during logout
+            false   // Debug logging off
+        );
+    }
+
+    public BoneType getBoneType() {
+        return boneType;
+    }
+
+    public BankLocation getBankLocation() {
+        return bankLocation;
+    }
+
+    public boolean isXpFailsafeEnabled() {
+        return xpFailsafeEnabled;
+    }
+
+    public int getXpFailsafeTimeoutMinutes() {
+        return xpFailsafeTimeoutMinutes;
+    }
+
+    public boolean isXpFailsafePauseDuringLogout() {
+        return xpFailsafePauseDuringLogout;
+    }
+
+    public boolean isDebugLogging() {
+        return debugLogging;
+    }
+
+    @Override
+    public String toString() {
+        return "EctoConfig{" +
+            "boneType=" + boneType +
+            ", bankLocation=" + bankLocation +
+            ", xpFailsafe=" + xpFailsafeEnabled +
+            " (" + xpFailsafeTimeoutMinutes + "m)" +
+            ", debugLog=" + debugLogging +
+            '}';
+    }
+}
