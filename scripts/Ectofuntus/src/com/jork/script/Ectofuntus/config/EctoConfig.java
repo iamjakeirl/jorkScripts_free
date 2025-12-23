@@ -10,6 +10,7 @@ public class EctoConfig {
 
     private final BoneType boneType;
     private final BankLocation bankLocation;
+    private final int bankTab;
     private final boolean xpFailsafeEnabled;
     private final int xpFailsafeTimeoutMinutes;
     private final boolean xpFailsafePauseDuringLogout;
@@ -18,6 +19,7 @@ public class EctoConfig {
     public EctoConfig(
         BoneType boneType,
         BankLocation bankLocation,
+        int bankTab,
         boolean xpFailsafeEnabled,
         int xpFailsafeTimeoutMinutes,
         boolean xpFailsafePauseDuringLogout,
@@ -25,6 +27,7 @@ public class EctoConfig {
     ) {
         this.boneType = boneType;
         this.bankLocation = bankLocation;
+        this.bankTab = bankTab;
         this.xpFailsafeEnabled = xpFailsafeEnabled;
         this.xpFailsafeTimeoutMinutes = xpFailsafeTimeoutMinutes;
         this.xpFailsafePauseDuringLogout = xpFailsafePauseDuringLogout;
@@ -38,6 +41,7 @@ public class EctoConfig {
         return new EctoConfig(
             BoneType.DRAGON_BONES,
             BankLocation.RING_OF_DUELING,
+            1,      // Bank tab 1
             true,   // XP failsafe enabled
             5,      // 5 minute timeout
             true,   // Pause during logout
@@ -51,6 +55,10 @@ public class EctoConfig {
 
     public BankLocation getBankLocation() {
         return bankLocation;
+    }
+
+    public int getBankTab() {
+        return bankTab;
     }
 
     public boolean isXpFailsafeEnabled() {
@@ -74,6 +82,7 @@ public class EctoConfig {
         return "EctoConfig{" +
             "boneType=" + boneType +
             ", bankLocation=" + bankLocation +
+            ", bankTab=" + bankTab +
             ", xpFailsafe=" + xpFailsafeEnabled +
             " (" + xpFailsafeTimeoutMinutes + "m)" +
             ", debugLog=" + debugLogging +

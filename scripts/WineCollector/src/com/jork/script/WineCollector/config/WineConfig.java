@@ -47,7 +47,7 @@ public class WineConfig {
     public static final int WINE_BOTTLE_COLOR = -5635841;  // Eclipse red wine RGB color
     public static final int WINE_COLOR_TOLERANCE = 5;      // Color matching tolerance
     public static final int WINE_CUBE_HEIGHT = 120;        // Tile cube height for wine bottle
-    public static final double WINE_CUBE_RESIZE_FACTOR = 0.5;  // Shrink cube to fit wine better
+    public static final double WINE_CUBE_RESIZE_FACTOR = 0.3;  // Shrink cube to focus tap area
     // Floor plane constants
     public static final int GROUND_FLOOR_PLANE = 0;
     public static final int SECOND_FLOOR_PLANE = 1;
@@ -77,4 +77,19 @@ public class WineConfig {
     public static final int POLL_DELAY_MEDIUM = 500;
     public static final int POLL_DELAY_LONG = 1000;
     public static final int POLL_DELAY_WORLD_HOP = 3000;
+
+    // Chatbox hop trigger configuration
+    // Multiple patterns for robust OCR error tolerance
+    // Full message: "You're a Group Ironman, so you can't take items that non-group members have dropped."
+    // Using multiple distinctive substrings increases reliability even with OCR errors
+    public static final String[] CHATBOX_HOP_TRIGGERS = {
+        "group ironman",        // Most distinctive phrase
+        "can't take items",     // Secondary match
+        "non-group members",    // Tertiary match
+        "can't take item"       // Handles potential plural/singular OCR errors
+    };
+
+    // Debug configuration
+    // Set to true to enable verbose chatbox message logging
+    public static final boolean ENABLE_DEBUG_LOGGING = true;
 }

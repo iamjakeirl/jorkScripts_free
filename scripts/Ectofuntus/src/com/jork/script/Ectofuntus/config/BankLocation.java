@@ -6,15 +6,17 @@ package com.jork.script.Ectofuntus.config;
  * @author jork
  */
 public enum BankLocation {
-    RING_OF_DUELING("Ring of Dueling (Castle Wars)", 2552),
-    WALK_PORT_PHASMATYS("Walk to Port Phasmatys", -1);
+    RING_OF_DUELING("Ring of Dueling (Castle Wars)", 2552, true),
+    WALK_PORT_PHASMATYS("Walk to Port Phasmatys", -1, false);
 
     private final String displayName;
     private final int itemId;  // -1 for walking (no item required)
+    private final boolean isWearable;  // true if teleport can be worn (allows 9 supplies instead of 8)
 
-    BankLocation(String displayName, int itemId) {
+    BankLocation(String displayName, int itemId, boolean isWearable) {
         this.displayName = displayName;
         this.itemId = itemId;
+        this.isWearable = isWearable;
     }
 
     public String getDisplayName() {
@@ -27,6 +29,10 @@ public enum BankLocation {
 
     public boolean requiresItem() {
         return itemId != -1;
+    }
+
+    public boolean isWearable() {
+        return isWearable;
     }
 
     @Override

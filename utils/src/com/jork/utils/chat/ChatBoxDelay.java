@@ -10,6 +10,9 @@ package com.jork.utils.chat;
  *   <li>Any other condition that might cause temporary text reading issues</li>
  * </ul>
  *
+ * <p><b>Note:</b> This class is not thread-safe. Configuration should occur during
+ * script initialization.
+ *
  * <p>Example usage:
  * <pre>{@code
  * ChatBoxDelay delay = new ChatBoxDelay(1500); // 1.5 second delay
@@ -26,7 +29,7 @@ package com.jork.utils.chat;
 public class ChatBoxDelay {
     private final long durationMillis;
     private long activatedAt;
-    private volatile boolean active;
+    private boolean active;
 
     /**
      * Creates a new ChatBoxDelay with the specified duration.

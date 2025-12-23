@@ -109,6 +109,15 @@ public class CollectTask implements Task {
         return wineEntryFound[0];
     }
 
+    /**
+     * Gets the current count of wines in inventory.
+     * @return Number of wines, or 0 if none
+     */
+    private int getWineCountInInventory() {
+        ItemGroupResult result = script.getWidgetManager().getInventory().search(Set.of(WineConfig.WINE_ID));
+        return (result != null) ? result.getAmount(WineConfig.WINE_ID) : 0;
+    }
+
     @Override
     public boolean canExecute() {
         // Always allow CollectTask to run - inventory check happens after wine detection
@@ -118,6 +127,26 @@ public class CollectTask implements Task {
     @Override
     public int execute() {
         // Assumes NavigateTask has already positioned us on the top floor
+
+        // PRIORITY CHECK: Chat hop trigger overrides all other logic
+        if (script.isChatHopTriggered()) {
+            ScriptLogger.warning(script, "Chat-based hop triggered - forcing world hop");
+            script.clearChatHopFlag();
+
+            ProfileManager profileManager = script.getProfileManager();
+            if (profileManager != null && profileManager.hasHopProfile()) {
+                boolean hopInitiated = profileManager.forceHop();
+                if (hopInitiated) {
+                    ScriptLogger.info(script, "World hop initiated successfully");
+                } else {
+                    ScriptLogger.warning(script, "Failed to initiate world hop");
+                }
+            } else {
+                ScriptLogger.warning(script, "No hop profile available - cannot hop");
+            }
+
+            return WineConfig.POLL_DELAY_WORLD_HOP;
+        }
 
         // Wine detection and collection
         if (detectWine(WineConfig.WINE_SPAWN_POSITION)) {
@@ -130,34 +159,48 @@ public class CollectTask implements Task {
             );
             script.pollFramesHuman(() -> true, inventoryCheckDelay);
 
-            // Check inventory AFTER detecting wine
+            // Check inventory BEFORE pickup attempt
             ItemGroupResult result = script.getWidgetManager().getInventory().search(Set.of());
             if (result != null && result.getOccupiedSlotCount() >= WineConfig.INVENTORY_SIZE) {
-                ScriptLogger.info(script, "Inventory full - stopping script");
-                script.stop();
-                return WineConfig.POLL_DELAY_LONG;
+                ScriptLogger.info(script, "Inventory full - will bank wines and continue");
+                script.setShouldBank(true);
+                return WineConfig.POLL_DELAY_MEDIUM;
             }
 
-            boolean pickedUp = pickupWine(WineConfig.WINE_SPAWN_POSITION);
+            // Get wine count BEFORE pickup
+            int winesBefore = getWineCountInInventory();
+            ScriptLogger.debug(script, "Wine count before pickup: " + winesBefore);
 
-            if (pickedUp) {
-                // Wait for wine to appear in inventory (non-human task check)
-                script.submitTask(() -> {
-                    ItemGroupResult invCheck = script.getWidgetManager()
-                        .getInventory().search(Set.of(WineConfig.WINE_ID));
-                    return invCheck != null && invCheck.getAmount(WineConfig.WINE_ID) > 0;
+            // Human pause before interacting with the wine
+            script.pollFramesHuman(() -> true, RandomUtils.uniformRandom(300, 500));
+
+            // Attempt pickup
+            boolean menuFound = pickupWine(WineConfig.WINE_SPAWN_POSITION);
+
+            if (menuFound) {
+                // Wait for wine to appear in inventory (verify count increased)
+                boolean wineCollected = script.submitTask(() -> {
+                    int winesNow = getWineCountInInventory();
+                    return winesNow > winesBefore;
                 }, WineConfig.PICKUP_TIMEOUT);
 
-                script.incrementWineCount();
-                ScriptLogger.info(script, "Wine collected successfully");
-                return WineConfig.POLL_DELAY_SHORT;
+                if (wineCollected) {
+                    script.incrementWineCount();
+                    ScriptLogger.info(script, "Wine collected successfully (inventory increased)");
+                    return WineConfig.POLL_DELAY_SHORT;
+                } else {
+                    // Menu was found but inventory didn't increase
+                    ScriptLogger.warning(script, "Wine pickup failed - inventory didn't increase (likely taken by another player)");
+                    // Fall through to world hop logic below
+                }
             } else {
-                // Menu entry not found - force hop
-                ScriptLogger.warning(script, "Failed to pick up wine - forcing world hop");
+                // Menu entry not found
+                ScriptLogger.warning(script, "Failed to pick up wine - menu entry not found");
+                // Fall through to world hop logic below
             }
         }
 
-        // No wine found or pickup failed - hop worlds
+        // No wine found OR pickup failed - hop worlds
         ProfileManager profileManager = script.getProfileManager();
         if (profileManager != null && profileManager.hasHopProfile()) {
             profileManager.forceHop();

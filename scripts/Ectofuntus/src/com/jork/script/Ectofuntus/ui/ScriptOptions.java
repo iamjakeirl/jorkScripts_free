@@ -39,6 +39,7 @@ public class ScriptOptions extends VBox {
     private static final String INPUT_FOCUS = "#363636";
 
     private final ComboBox<String> boneTypeDropdown;
+    private final ComboBox<Integer> bankTabDropdown;
     private final ComboBox<String> bankLocationDropdown;
     private final CheckBox xpFailsafeCheck;
     private final TextField xpFailsafeTimeoutInput;
@@ -94,6 +95,36 @@ public class ScriptOptions extends VBox {
 
         VBox boneSection = new VBox(5, boneSectionLabel, boneRow);
         boneSection.setPadding(new Insets(0, 0, 10, 0));
+
+        // ── Bank Tab Section ────────────────────────────────────────
+        Label bankTabSectionLabel = new Label("BANK SETTINGS");
+        bankTabSectionLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: " + TEXT_SECONDARY + ";");
+
+        Label bankTabLbl = new Label("Bank Tab:");
+        bankTabLbl.setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; -fx-font-size: 11px;");
+        bankTabLbl.setMinWidth(80);
+
+        bankTabDropdown = new ComboBox<>();
+        bankTabDropdown.setPrefWidth(200);
+        bankTabDropdown.setStyle(getComboBoxStyle());
+        styleComboBox(bankTabDropdown);
+
+        // Add tabs 1-9
+        for (int i = 1; i <= 9; i++) {
+            bankTabDropdown.getItems().add(i);
+        }
+        bankTabDropdown.getSelectionModel().select(0); // Default to tab 1
+
+        HBox bankTabRow = new HBox(10, bankTabLbl, bankTabDropdown);
+        bankTabRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label bankTabInfo = new Label("Select the bank tab where you store your supplies");
+        bankTabInfo.setStyle("-fx-text-fill: " + TEXT_SECONDARY + "; -fx-font-size: 9px;");
+        bankTabInfo.setWrapText(true);
+        bankTabInfo.setPadding(new Insets(0, 0, 0, 0));
+
+        VBox bankTabSection = new VBox(5, bankTabSectionLabel, bankTabRow, bankTabInfo);
+        bankTabSection.setPadding(new Insets(0, 0, 10, 0));
 
         // ── Banking Method Section ─────────────────────────────────
         Label bankSectionLabel = new Label("BANKING METHOD");
@@ -198,6 +229,8 @@ public class ScriptOptions extends VBox {
             // Build configuration
             BoneType selectedBone = BoneType.fromDisplayName(boneTypeDropdown.getValue());
             BankLocation selectedBank = BankLocation.fromDisplayName(bankLocationDropdown.getValue());
+            Integer selectedBankTab = bankTabDropdown.getValue();
+            if (selectedBankTab == null) selectedBankTab = 1; // Default to tab 1
 
             // Build options map
             Map<String, Object> options = new HashMap<>();
@@ -216,6 +249,7 @@ public class ScriptOptions extends VBox {
             EctoConfig config = new EctoConfig(
                 selectedBone,
                 selectedBank,
+                selectedBankTab,
                 xpFailsafeCheck.isSelected(),
                 (Integer) options.get("xpFailsafeTimeout"),
                 xpFailsafePauseDuringLogoutCheck.isSelected(),
@@ -229,6 +263,7 @@ public class ScriptOptions extends VBox {
         // Add all sections to content box
         contentBox.getChildren().addAll(
             boneSection,
+            bankTabSection,
             bankSection,
             advancedSection,
             failsafeSection
@@ -307,31 +342,31 @@ public class ScriptOptions extends VBox {
     /**
      * Applies custom styling to ComboBox cells for better dark theme support
      */
-    private void styleComboBox(ComboBox<String> comboBox) {
+    private <T> void styleComboBox(ComboBox<T> comboBox) {
         // Style the button cell (displayed item)
-        comboBox.setButtonCell(new javafx.scene.control.ListCell<String>() {
+        comboBox.setButtonCell(new javafx.scene.control.ListCell<T>() {
             @Override
-            protected void updateItem(String item, boolean empty) {
+            protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(item);
+                    setText(item.toString());
                     setStyle("-fx-text-fill: " + TEXT_PRIMARY + ";");
                 }
             }
         });
 
         // Style the dropdown list cells
-        comboBox.setCellFactory(listView -> new javafx.scene.control.ListCell<String>() {
+        comboBox.setCellFactory(listView -> new javafx.scene.control.ListCell<T>() {
             @Override
-            protected void updateItem(String item, boolean empty) {
+            protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
                     setStyle("");
                 } else {
-                    setText(item);
+                    setText(item.toString());
                     setStyle("-fx-text-fill: " + TEXT_PRIMARY + "; " +
                             "-fx-background-color: " + INPUT_BG + ";");
 

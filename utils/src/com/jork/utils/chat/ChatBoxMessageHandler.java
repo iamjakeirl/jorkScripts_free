@@ -3,9 +3,6 @@ package com.jork.utils.chat;
 /**
  * Functional interface for handling chatbox messages.
  *
- * <p>This interface is designed to be used with lambda expressions or method references
- * for a clean, fluent API when registering message handlers.
- *
  * <p>Example usage:
  * <pre>{@code
  * // Lambda expression
